@@ -8,5 +8,5 @@ python-dotenv
 pytest
 pytest-asyncio
 aiohttp
-mlbstatsapi
+git+https://github.com/toddrob99/MLB-StatsAPI.git
 pybaseball

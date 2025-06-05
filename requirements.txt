@@ -1,0 +1,12 @@
+discord.py
+aiohttp
+pytesseract
+mlbstatsapi
+pybaseball
+gspread
+oauth2client
+openai
+requests
+python-dotenv
+pytest
+pytest-asyncio

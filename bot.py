@@ -29,7 +29,7 @@ async def log_guild_count() -> None:
     log.info("Currently connected to %d guild(s)", len(bot.guilds))
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     log.info(f"GotLockz bot logged in as {bot.user} (ID: {bot.user.id})")
     log.info(f"Registering slash commands to guild {GUILD_ID}…")
 

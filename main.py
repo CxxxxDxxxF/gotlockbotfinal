@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import datetime
 
@@ -13,13 +12,18 @@ from bot import run_bot
 
 def current_timestamp() -> str:
     """Return the current UTC timestamp as a string."""
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    return (
+        datetime.datetime.now(datetime.timezone.utc)
+        .strftime("%Y-%m-%d %H:%M:%S UTC")
+    )
 
 
 def ready_message(user: discord.ClientUser | None) -> str:
     """Format the ready log message with a timestamp."""
-    return f"\u2714\ufe0f GotLockz bot logged in as {user} at {current_timestamp()}"
-
+    return (
+        "\u2714\ufe0f GotLockz bot logged in as "
+        f"{user} at {current_timestamp()}"
+    )
 
 
 def main() -> None:

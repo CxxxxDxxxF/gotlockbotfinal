@@ -45,11 +45,18 @@ async def on_ready():
 )
 @app_commands.describe(
     units="How many units (e.g. 1.0) to wager on this pick",
+    analysis="Write-up to accompany the pick",
     channel="Which channel to post the pick in"
 )
-async def postpick(interaction: discord.Interaction, units: float, channel: discord.TextChannel):
+async def postpick(
+    interaction: discord.Interaction,
+    units: float,
+    analysis: str,
+    channel: discord.TextChannel,
+):
     """
     /postpick handler: confirm the pick and post it into the specified channel.
+    Sends the analysis text and embed together so they appear in one message.
     """
     # Acknowledge immediately (defer) so the user does not see an “application did not respond” error.
     await interaction.response.defer(ephemeral=True)
@@ -61,8 +68,8 @@ async def postpick(interaction: discord.Interaction, units: float, channel: disc
     )
     embed.set_footer(text="Good luck! 🍀")
 
-    # Send that embed to the target channel.
-    await channel.send(embed=embed)
+    # Send both the analysis text and the embed in a single message.
+    await channel.send(content=analysis, embed=embed)
 
     # Finally, send a follow-up to the original user confirming it was posted.
     await interaction.followup.send(

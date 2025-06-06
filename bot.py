@@ -92,7 +92,11 @@ async def analyze_bet(interaction: discord.Interaction, image: discord.Attachmen
     except Exception as e:
         log.error(f"Failed to process bet image: {e}")
         await interaction.followup.send("\u274C Failed to analyze the bet slip. Please make sure the image is clear and try again.", ephemeral=True)
-
+    finally:
+        try:
+            os.remove(image_path)
+        except OSError:
+            pass
 if __name__ == "__main__":
     try:
         run_bot()

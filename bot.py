@@ -1,105 +1,163 @@
+# bot.py
+
 import os
-import logging
+import re
 import discord
 from discord import app_commands
 from discord.ext import commands
-from image_processing import extract_text_from_image, parse_bet_details
-from ai_analysis import generate_analysis
+from datetime import datetime
 
-# Basic logging
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("gotlockz")
+# Import your helper functions (make sure these files exist in your repo)
+from ocr_utils import run_ocr_on_image
+from mlb_utils import get_game_start_time
+from ai_utils import generate_analysis
 
-# Read token and guild from environment
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID = int(os.getenv("GUILD_ID", "0"))
+# Read environment variables
+TOKEN    = os.getenv("DISCORD_TOKEN")
+GUILD_ID = os.getenv("GUILD_ID")
 
-# Create intents – we only need default intents for slash commands
+if not TOKEN or not GUILD_ID:
+    raise RuntimeError("DISCORD_TOKEN or GUILD_ID not set in environment")
+
+# Intents and bot setup
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
-tree = bot.tree
+bot = commands.Bot(command_prefix="/", intents=intents)
 
-
-def run_bot() -> None:
-    """Run the Discord bot after validating configuration."""
-    if DISCORD_TOKEN is None or GUILD_ID == 0:
-        raise RuntimeError("DISCORD_TOKEN or GUILD_ID not set in environment")
-    bot.run(DISCORD_TOKEN)
 
 @bot.event
-async def on_ready() -> None:
-    log.info(f"GotLockz bot logged in as {bot.user} (ID: {bot.user.id})")
-    log.info(f"Registering slash commands to guild {GUILD_ID}…")
+async def on_ready():
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    # Sync slash commands to the specified guild so that /postpick appears quickly.
+    guild = discord.Object(id=int(GUILD_ID))
+    await bot.tree.sync(guild=guild)
+    print("✅ Synchronized slash commands.")
 
-    guild = discord.Object(id=GUILD_ID)
-    tree.copy_global_to(guild=guild)
-    await tree.sync(guild=guild)
 
-    log.info("Slash commands synced.")
-
-@tree.command(
+@bot.tree.command(
     name="postpick",
-    description="Register a pick and post it to your chosen channel",
-    guild=discord.Object(id=GUILD_ID)
+    description="Upload a bet slip image and post the VIP pick with AI analysis."
 )
 @app_commands.describe(
-    units="How many units (e.g. 1.0) to wager on this pick",
-    channel="Which channel to post the pick in"
+    image="Attach the bet‐slip image file here",
+    units="How many units are you staking?"
 )
-async def postpick(interaction: discord.Interaction, units: float, channel: discord.TextChannel):
+async def postpick(interaction: discord.Interaction, image: discord.Attachment, units: float):
+    """
+    /postpick handler:
+    1) Download the attached image to /tmp
+    2) Run OCR on it to extract 'Team A at Team B', odds, etc.
+    3) Look up the game start time via MLB-StatsAPI
+    4) Generate an AI analysis paragraph
+    5) Build & send a single Embed + attach the original image
+    6) Send a follow-up ephemeral message confirming success
+    """
+
+    # 1) Acknowledge immediately to avoid "The application did not respond"
     await interaction.response.defer(ephemeral=True)
 
-    embed = discord.Embed(
-        title="\U0001F4E3 New Pick Posted!",
-        description=f"**Units:** {units}\n**Picked by:** {interaction.user.mention}"
+    # 2) Download the image locally
+    local_filename = f"/tmp/{image.filename}"
+    try:
+        await image.save(local_filename)
+    except Exception as e:
+        await interaction.followup.send(
+            f"⚠️ Failed to download the attached image: {e}",
+            ephemeral=True
+        )
+        return
+
+    # 3) Run OCR on the downloaded image
+    try:
+        ocr_text = await run_ocr_on_image(local_filename)
+    except Exception as e:
+        await interaction.followup.send(
+            f"⚠️ OCR processing failed: {e}",
+            ephemeral=True
+        )
+        return
+
+    # 4) Parse the OCR text for matchup, odds, etc.
+    #    We’ll join all lines into one string to simplify regex searching.
+    lines = ocr_text.splitlines()
+    full_text = " ".join(lines)
+
+    # 4a) Find "Team A at Team B"
+    match = re.search(r"([A-Za-z\s]+)\s+at\s+([A-Za-z\s]+)", full_text, re.IGNORECASE)
+    if not match:
+        await interaction.followup.send(
+            "⚠️ Could not detect a valid ‘Team A at Team B’ pattern in the uploaded image. "
+            "Make sure your bet slip clearly shows something like ‘New York Mets at New York Yankees’.",
+            ephemeral=True
+        )
+        return
+
+    away_team = match.group(1).strip()
+    home_team = match.group(2).strip()
+    matchup_text = f"{away_team} @ {home_team}"
+
+    # 4b) Extract odds (first occurrence of + or - followed by 2–3 digits)
+    odds_match = re.search(r"([+-]\d{2,3})", full_text)
+    odds_text = odds_match.group(1) if odds_match else "N/A"
+
+    # 4c) Assume the game date is "today" (UTC). Format as YYYY-MM-DD.
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # 5) Fetch the start time of today's matchup (e.g. "7:05 PM EST")
+    try:
+        start_time = await get_game_start_time(away_team, home_team, today_str)
+        if not start_time:
+            start_time = "N/A"
+    except Exception as e:
+        # If the MLB API fails, we’ll default to "N/A" but continue.
+        print(f"⚠️ MLB API error: {e}")
+        start_time = "N/A"
+
+    # 6) Generate AI analysis via OpenAI
+    analysis_prompt = (
+        f"Write a concise, insightful baseball betting analysis for the matchup "
+        f"{away_team} at {home_team} on {today_str} with odds {odds_text}. "
+        f"Use recent team and player statistics to support the pick."
     )
-    embed.set_footer(text="Good luck! \U0001F340")
+    try:
+        ai_paragraph = await generate_analysis(analysis_prompt)
+        # If OpenAI returns an empty string or errors, fallback message:
+        if not ai_paragraph:
+            ai_paragraph = "N/A ― AI analysis unavailable."
+    except Exception as e:
+        print(f"⚠️ OpenAI error: {e}")
+        ai_paragraph = "N/A ― AI analysis failed."
 
-    await channel.send(embed=embed)
 
+    # 7) Build a Discord Embed containing all extracted and generated data
+    embed = discord.Embed(
+        title=f"📣 VIP Pick – {today_str}",
+        description=f"Matchup: **{matchup_text}**\nOdds: **{odds_text}**\n"
+    )
+    embed.add_field(name="Start Time (EST)", value=start_time, inline=True)
+    embed.add_field(name="Units", value=str(units), inline=True)
+    embed.add_field(name="Analysis", value=ai_paragraph, inline=False)
+    embed.set_footer(text=f"Picked by {interaction.user.display_name} • Good luck! 🍀")
+
+    # 8) Send the embed AND attach the original image in one message
+    target_channel: discord.TextChannel = interaction.channel  # same channel where /postpick was invoked
+    try:
+        await target_channel.send(
+            embed=embed,
+            file=discord.File(local_filename)
+        )
+    except Exception as e:
+        await interaction.followup.send(
+            f"⚠️ Failed to post the pick to {target_channel.mention}: {e}",
+            ephemeral=True
+        )
+        return
+
+    # 9) Finally, confirm back to the user that their pick has been posted
     await interaction.followup.send(
-        f"\u2705 Your pick of **{units} units** has been posted in {channel.mention}.",
+        f"✅ Your VIP pick has been posted in {target_channel.mention}.",
         ephemeral=True
     )
 
-@tree.command(
-    name="analyze_bet",
-    description="Upload a bet slip image to generate an AI-backed breakdown",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.describe(
-    image="Upload an image of your MLB bet slip"
-)
-async def analyze_bet(interaction: discord.Interaction, image: discord.Attachment):
-    await interaction.response.defer(ephemeral=True)
 
-    image_path = f"/tmp/{image.filename}"
-    await image.save(image_path)
-
-    try:
-        text = extract_text_from_image(image_path)
-        bet_details = parse_bet_details(text)
-        analysis = await generate_analysis(bet_details)
-
-        embed = discord.Embed(title="\U0001F52E Bet Analysis Report")
-        for key, value in bet_details.items():
-            embed.add_field(name=key.capitalize(), value=value, inline=False)
-        embed.add_field(name="AI Analysis", value=analysis, inline=False)
-        embed.set_footer(text="Generated by GotLockz AI \U0001F916")
-
-        await interaction.followup.send(embed=embed, ephemeral=False)
-
-    except Exception as e:
-        log.error(f"Failed to process bet image: {e}")
-        await interaction.followup.send("\u274C Failed to analyze the bet slip. Please make sure the image is clear and try again.", ephemeral=True)
-    finally:
-        try:
-            os.remove(image_path)
-        except OSError:
-            pass
 if __name__ == "__main__":
-    try:
-        run_bot()
-    except Exception as exc:  # pragma: no cover - runtime failure
-        log.error("Bot failed to start: %s", exc)
-        raise
+    bot.run(TOKEN)

@@ -1,10 +1,11 @@
 import pytesseract
 from PIL import Image
 import re
+from datetime import datetime
 
 def extract_text_from_image(image_path: str) -> str:
     """
-    Opens the image at image_path and returns all OCR’d text as one string.
+    Run Tesseract OCR on the given image file and return the raw text.
     """
     image = Image.open(image_path)
     text = pytesseract.image_to_string(image)
@@ -12,14 +13,13 @@ def extract_text_from_image(image_path: str) -> str:
 
 def parse_bet_details(text: str) -> dict:
     """
-    Given OCR’d text, attempts to parse:
-      - pick   (e.g. "Tampa Bay Rays Money Line" or "Zack Wheeler 6+ Strikeouts")
-      - game   (e.g. "Tampa Bay Rays vs New York Yankees")
-      - date   (e.g. "6/5/25")
-      - time   (e.g. "7:00 PM EST")
-      - units  (e.g. "12")
-      - vip    ("Yes" or "No")
-    Returns a dict with keys ["pick","game","date","time","units","vip"].
+    Very basic extraction logic. Scans OCR text for
+    - a “pick” line
+    - a “game” line (contains “vs”)
+    - a date line (matches MM/DD or MM/DD/YYYY)
+    - a time line (matches HH:MM AM/PM)
+    - a “units” line (e.g. “2.5 units”)
+    - a “vip” indicator (if the word “vip” appears)
     """
     bet_details = {
         "pick": "Not found",
@@ -36,34 +36,54 @@ def parse_bet_details(text: str) -> dict:
         if not line:
             continue
 
-        # Units: “12 units” or “1.5 units”
-        if "units" in line.lower():
+        lower = line.lower()
+
+        # Units
+        if "units" in lower:
             match = re.search(r"(\d+(\.\d+)?)\s*units", line, re.IGNORECASE)
             if match:
                 bet_details["units"] = match.group(1)
 
-        # VIP flag
-        if "vip" in line.lower():
+        # VIP
+        if "vip" in lower:
             bet_details["vip"] = "Yes"
 
-        # Game: “Team A vs Team B” (we’ll normalize later)
-        if "vs" in line.lower():
+        # Game (expects something like "Tampa Bay Rays vs New York Yankees")
+        if "vs" in lower:
             bet_details["game"] = line
 
-        # Date like “6/5/25” or “06/05/2025”
-        if re.search(r"\b\d{1,2}/\d{1,2}(/\d{2,4})?\b", line):
-            bet_details["date"] = line
+        # Date (matches 6/5/25 or 06/05/2025, etc.)
+        date_match = re.search(r"\b(\d{1,2})/(\d{1,2})(/(\d{2,4}))?\b", line)
+        if date_match:
+            try:
+                # Try to normalize into MM/DD/YYYY (4-digit year)
+                month = int(date_match.group(1))
+                day = int(date_match.group(2))
+                year = date_match.group(4)
+                if year is None:
+                    # If no year given, assume current year
+                    year = datetime.utcnow().year
+                else:
+                    year = int(year)
+                    if year < 100:  # e.g. "25" -> "2025"
+                        year += 2000
+                dt = datetime(year, month, day)
+                bet_details["date"] = dt.strftime("%Y-%m-%d")
+            except Exception:
+                bet_details["date"] = line  # leave raw if parsing fails
 
-        # Time like “7:00 PM” or “19:05”
-        if re.search(r"\b\d{1,2}:\d{2}\s*(AM|PM)?\b", line, re.IGNORECASE):
-            bet_details["time"] = line
+        # Time (matches "7:05 PM" or "12:30 AM" etc.)
+        time_match = re.search(r"\b(\d{1,2}:\d{2}\s*(AM|PM)?)\b", line, re.IGNORECASE)
+        if time_match:
+            bet_details["time"] = time_match.group(1).upper()
 
-        # Pick details (anything after “Pick:” for example)
-        if "pick" in line.lower():
-            # split on “pick” and keep everything after it
-            parts = re.split(r"pick[:\-]?", line, flags=re.IGNORECASE)
-            if len(parts) >= 2 and parts[1].strip():
-                bet_details["pick"] = parts[1].strip()
+        # Pick (line containing the word "pick")
+        if "pick" in lower and bet_details["pick"] == "Not found":
+            # e.g. "Pick: Tampa Bay Rays ML (-110)"
+            parts = re.split(r"pick[:\-]", line, flags=re.IGNORECASE)
+            if len(parts) >= 2:
+                bet_details["pick"] = parts[-1].strip()
+            else:
+                bet_details["pick"] = line  # fallback
 
     return bet_details
-

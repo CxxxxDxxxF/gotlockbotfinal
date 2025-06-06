@@ -1,0 +1,10 @@
+discord.py
+openai
+google-api-python-client
+gspread
+oauth2client
+pybaseball
+git+https://github.com/toddrob99/MLB-StatsAPI.git
+pytesseract
+Pillow
+python-dotenv

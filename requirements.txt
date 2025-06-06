@@ -10,3 +10,4 @@ pytest-asyncio
 aiohttp
 git+https://github.com/toddrob99/MLB-StatsAPI.git
 pybaseball
+pillow

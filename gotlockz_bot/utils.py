@@ -1,1 +1,7 @@
-# Stub file for utils.py. Actual implementation will be added later.
+"""Miscellaneous utility helpers."""
+
+import logging
+
+
+def setup_logging(level=logging.INFO):
+    logging.basicConfig(level=level)

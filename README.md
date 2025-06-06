@@ -15,6 +15,10 @@ You can copy `.env.example` to `.env` and edit it with your own values when runn
 cp .env.example .env
 ```
 
+The OCR functionality in `/analyze_bet` requires the `tesseract-ocr` engine and
+its development libraries. Refer to the Dockerfile for the full list of apt
+packages that need to be installed.
+
 ## Running locally
 
 ```bash

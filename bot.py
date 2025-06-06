@@ -74,10 +74,14 @@ async def postpick(interaction: discord.Interaction, units: float, channel: disc
 # Run the bot
 # —————————————————————————————————————————————
 
-if __name__ == "__main__":
-    # Ensure environment variables exist:
+def run_bot() -> None:
+    """Run the Discord bot after validating environment variables."""
     if DISCORD_TOKEN is None or GUILD_ID == 0:
         log.error("DISCORD_TOKEN or GUILD_ID not set in environment!")
-        exit(1)
+        return
 
     bot.run(DISCORD_TOKEN)
+
+
+if __name__ == "__main__":
+    run_bot()

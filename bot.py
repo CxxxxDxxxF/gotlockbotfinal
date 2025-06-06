@@ -40,26 +40,43 @@ async def on_ready():
 
 @tree.command(
     name="postpick",
-    description="Register a pick and post it to your chosen channel",
+    description="Register a pick and post it (with analysis) into your chosen channel",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
     units="How many units (e.g. 1.0) to wager on this pick",
-    channel="Which channel to post the pick in"
+    channel="Which channel to post the pick in",
+    image_url="Public URL of your bet-slip image (e.g. Fanatics embed link)",
+    analysis="Your analysis text (can be multiple sentences)"
 )
-async def postpick(interaction: discord.Interaction, units: float, channel: discord.TextChannel):
+async def postpick(
+    interaction: discord.Interaction,
+    units: float,
+    channel: discord.TextChannel,
+    image_url: str,
+    analysis: str
+):
     """
-    /postpick handler: confirm the pick and post it into the specified channel.
+    /postpick handler: confirm the pick, embed the bet-slip image and analysis in one post,
+    and send it to the specified channel.
     """
     # Acknowledge immediately (defer) so the user does not see an “application did not respond” error.
     await interaction.response.defer(ephemeral=True)
 
-    # Build a nice embed summarizing the pick.
+    # Build a single embed that contains the bet-slip image and the analysis
     embed = discord.Embed(
-        title="📣 New Pick Posted!",
-        description=f"**Units:** {units}\n**Picked by:** {interaction.user.mention}"
+        title="📣 New Pick Posted! 📣",
+        description=f"**Units:** {units}  \u2003•  Picked by {interaction.user.mention}",
+        color=discord.Color.green(),
     )
-    embed.set_footer(text="Good luck! 🍀")
+
+    # Attach the bet-slip image
+    embed.set_image(url=image_url)
+
+    # Include the analysis text
+    embed.add_field(name="\ud83d\udcdd Analysis", value=analysis, inline=False)
+
+    embed.set_footer(text="Good luck! \ud83c\udf40")
 
     # Send that embed to the target channel.
     await channel.send(embed=embed)

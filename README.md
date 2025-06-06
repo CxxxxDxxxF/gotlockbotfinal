@@ -21,6 +21,16 @@ Run the bot with:
 python bot.py
 ```
 
+## Docker
+
+You can also run the bot in a container. Build the image and run it while
+providing the required environment variables:
+
+```bash
+docker build -t gotlockz-bot .
+docker run -e DISCORD_TOKEN=<your token> -e OPENAI_API_KEY=<your key> gotlockz-bot
+```
+
 The bot currently implements the following commands:
 
 - `/ping` – respond with "Pong!".

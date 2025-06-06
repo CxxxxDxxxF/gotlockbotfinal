@@ -1,11 +1,12 @@
 # GotLockz Discord Bot
 
-This repository contains a simple Discord bot that posts picks via a `/postpick` slash command. The bot uses `discord.py` 2.5+ and registers commands to a single guild for faster updates.
+This repository contains a simple Discord bot that posts picks via a `/postpick` slash command and can analyse bet slip images with `/analyze_bet`. The bot uses `discord.py` 2.5+ and registers commands to a single guild for faster updates.
 
 ## Environment variables
 
 - `DISCORD_TOKEN` – your bot's token
 - `GUILD_ID` – ID of the guild where slash commands should be registered
+- `OPENAI_API_KEY` – optional, used to power the `/analyze_bet` command
 
 These need to be configured in your local shell or in Render.com's **Environment Variables** settings.
 You can copy `.env.example` to `.env` and edit it with your own values when running locally:
@@ -30,7 +31,7 @@ python bot.py
 2. Set `DISCORD_TOKEN` and `GUILD_ID` in the service's environment variables.
 3. Render will build the Dockerfile and run `python bot.py` automatically.
 
-Slash commands will sync when the bot starts. The `/postpick` command accepts a unit amount and a text channel and posts an embed in that channel while replying ephemerally to the user.
+Slash commands will sync when the bot starts. The `/postpick` command accepts a unit amount and a text channel and posts an embed in that channel while replying ephemerally to the user. The `/analyze_bet` command lets users upload a bet slip image and returns an AI-generated breakdown when `OPENAI_API_KEY` is configured.
 
 ## Running tests
 

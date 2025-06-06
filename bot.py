@@ -19,6 +19,13 @@ intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
+
+def run_bot() -> None:
+    """Run the Discord bot after validating configuration."""
+    if DISCORD_TOKEN is None or GUILD_ID == 0:
+        raise RuntimeError("DISCORD_TOKEN or GUILD_ID not set in environment")
+    bot.run(DISCORD_TOKEN)
+
 @bot.event
 async def on_ready():
     log.info(f"GotLockz bot logged in as {bot.user} (ID: {bot.user.id})")
@@ -87,8 +94,8 @@ async def analyze_bet(interaction: discord.Interaction, image: discord.Attachmen
         await interaction.followup.send("\u274C Failed to analyze the bet slip. Please make sure the image is clear and try again.", ephemeral=True)
 
 if __name__ == "__main__":
-    if DISCORD_TOKEN is None or GUILD_ID == 0:
-        log.error("DISCORD_TOKEN or GUILD_ID not set in environment!")
-        exit(1)
-
-    bot.run(DISCORD_TOKEN)
+    try:
+        run_bot()
+    except Exception as exc:  # pragma: no cover - runtime failure
+        log.error("Bot failed to start: %s", exc)
+        raise

@@ -1,6 +1,13 @@
 # Use official Python image
 FROM python:3.11-slim
 
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       git \
+       tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set working directory
 WORKDIR /app
 
@@ -15,4 +22,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends git tesseract-o
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Start the bot (replace with your main filename if different)
-CMD ["python", "main.py"]
+CMD ["python", "main.py", "--log-level", "INFO"]

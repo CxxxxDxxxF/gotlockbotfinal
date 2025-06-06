@@ -79,7 +79,7 @@ async def analyze_bet(interaction: discord.Interaction, image: discord.Attachmen
     try:
         text = extract_text_from_image(image_path)
         bet_details = parse_bet_details(text)
-        analysis = generate_analysis(bet_details)
+        analysis = await generate_analysis(bet_details)
 
         embed = discord.Embed(title="\U0001F52E Bet Analysis Report")
         for key, value in bet_details.items():

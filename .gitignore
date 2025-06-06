@@ -1,4 +1,88 @@
-__pycache__/
+Byte-compiled / optimized / DLL files
+pycache/
+*.py[cod]
+*$py.class
+
+C extensions
+*.so
+
+Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+PyInstaller
+Usually contains the output of PyInstaller builds
+*.manifest
+.spec
+
+Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+pytest
 .pytest_cache/
-*.pyc
+
+Environments
 .env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+Jupyter Notebook
+.ipynb_checkpoints
+
+pyenv
+.python-version
+
+VSCode settings
+.vscode/
+
+mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+Pyre type checker
+.pyre/
+
+Secrets or config files (make sure these are NOT tracked)
+config.json
+secrets.env
+token.txt
+
+System files
+.DS_Store
+Thumbs.db
+
+Logs
+*.log
+logs/

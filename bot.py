@@ -4,7 +4,7 @@ import os
 import logging
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 # Basic logging
 logging.basicConfig(level=logging.INFO)
@@ -22,30 +22,11 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Set up a Tree for application commands
 tree = bot.tree
 
-@bot.event
-async def on_read# bot.py
 
-import os
-import logging
-import discord
-from discord import app_commands
-from discord.ext import commands
-
-# Basic logging
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("gotlockz")
-
-# Read token and guild from environment
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-# Make sure GUILD_ID is set in Render’s Environment Variables page as an integer (e.g. “123456789012345678”)
-GUILD_ID = int(os.getenv("GUILD_ID", "0"))
-
-# Create intents – we only need default intents for slash commands
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# Set up a Tree for application commands
-tree = bot.tree
+@tasks.loop(minutes=30)
+async def log_guild_count() -> None:
+    """Log how many guilds the bot is connected to."""
+    log.info("Currently connected to %d guild(s)", len(bot.guilds))
 
 @bot.event
 async def on_ready():
@@ -58,6 +39,10 @@ async def on_ready():
     await tree.sync(guild=guild)
 
     log.info("Slash commands synced.")
+
+    if not log_guild_count.is_running():
+        log_guild_count.start()
+
 
 # ———————————————————————————————————————————————
 # Define the /postpick command on the tree
@@ -95,14 +80,20 @@ async def postpick(interaction: discord.Interaction, units: float, channel: disc
         ephemeral=True
     )
 
+
+def run_bot() -> None:
+    """Run the Discord bot after validating configuration."""
+    if DISCORD_TOKEN is None or GUILD_ID == 0:
+        raise RuntimeError("DISCORD_TOKEN or GUILD_ID not set in environment")
+    bot.run(DISCORD_TOKEN)
+
 # —————————————————————————————————————————————
 # Run the bot
 # —————————————————————————————————————————————
 
 if __name__ == "__main__":
-    # Ensure environment variables exist:
-    if DISCORD_TOKEN is None or GUILD_ID == 0:
-        log.error("DISCORD_TOKEN or GUILD_ID not set in environment!")
-        exit(1)
-
-    bot.run(DISCORD_TOKEN)
+    try:
+        run_bot()
+    except Exception as exc:  # pragma: no cover - runtime failure
+        log.error("Bot failed to start: %s", exc)
+        raise

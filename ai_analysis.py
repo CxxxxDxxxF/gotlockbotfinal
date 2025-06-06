@@ -2,14 +2,18 @@ import os
 import logging
 import openai
 
+_client: openai.AsyncOpenAI | None = None
+
 log = logging.getLogger(__name__)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+_api_key = os.getenv("OPENAI_API_KEY")
+if _api_key:
+    _client = openai.AsyncOpenAI(api_key=_api_key)
 
 
 async def generate_analysis(bet_details: dict) -> str:
     """Generate a short analysis of the bet using OpenAI asynchronously."""
-    if not openai.api_key:
+    if _client is None:
         log.warning("OPENAI_API_KEY is not configured; skipping analysis")
         return "AI analysis unavailable"
 
@@ -20,7 +24,7 @@ async def generate_analysis(bet_details: dict) -> str:
     user_content = "\n".join(f"{k}: {v}" for k, v in bet_details.items())
 
     try:
-        response = await openai.ChatCompletion.acreate(
+        response = await _client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_msg},
@@ -28,7 +32,7 @@ async def generate_analysis(bet_details: dict) -> str:
             ],
             max_tokens=150,
         )
-        return response.choices[0].message["content"].strip()
+        return response.choices[0].message.content.strip()
     except Exception as exc:  # pragma: no cover - network failure
         log.error("OpenAI request failed: %s", exc)
         return "Unable to generate AI analysis."

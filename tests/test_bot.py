@@ -57,3 +57,19 @@ def test_analyze_bet_file_cleanup(monkeypatch):
     asyncio.run(bot.analyze_bet.callback(interaction, attachment))
 
     assert not os.path.exists(f"/tmp/{attachment.filename}")
+
+
+def test_ping_command(monkeypatch):
+    interaction = DummyInteraction()
+    monkeypatch.setattr(
+        discord.ext.commands.Bot,
+        "latency",
+        property(lambda self: 0.123),
+    )
+
+    asyncio.run(bot.ping.callback(interaction))
+
+    assert interaction.response.ephemeral
+    args, kwargs = interaction.followup.sent[0]
+    assert args[0].startswith("Pong!")
+    assert kwargs["ephemeral"] is True

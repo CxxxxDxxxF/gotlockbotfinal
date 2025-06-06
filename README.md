@@ -6,7 +6,9 @@ This repository contains a simple Discord bot that posts picks via a `/postpick`
 
 - `DISCORD_TOKEN` – your bot's token
 - `GUILD_ID` – ID of the guild where slash commands should be registered
-- `OPENAI_API_KEY` – optional, used to power the `/analyze_bet` command
+- `OPENAI_API_KEY` – optional, used to power the `/analyze_bet` command using the OpenAI API v1
+
+The bot uses the asynchronous `openai.OpenAI` client when this key is set.
 
 These need to be configured in your local shell or in Render.com's **Environment Variables** settings.
 You can copy `.env.example` to `.env` and edit it with your own values when running locally:

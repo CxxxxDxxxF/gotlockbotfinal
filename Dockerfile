@@ -4,15 +4,20 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Copy everything
+# Copy project files
 COPY . .
 
-# Install system packages required for some Python dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends git tesseract-ocr \
+# Install OS dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git tesseract-ocr libtesseract-dev libleptonica-dev pkg-config poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Install Python packages
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
 
-# Start the bot (replace with your main filename if different)
-CMD ["python", "main.py"]
+# Set environment variables from .env file (optional, if you use Docker secrets instead skip this)
+ENV PYTHONUNBUFFERED=1
+
+# Run bot
+CMD ["python", "bot.py"]

@@ -32,6 +32,16 @@ python bot.py
 
 Slash commands will sync when the bot starts. The `/postpick` command accepts a unit amount and a text channel and posts an embed in that channel while replying ephemerally to the user.
 
+## Code structure
+
+The bot is organized into small modules so each file focuses on a single task:
+
+- `bot.py` – creates the Discord client and runs the application.
+- `commands.py` – defines slash commands such as `/postpick`.
+- `tasks.py` – background tasks like periodic guild count logging.
+
+Keeping functionality split across modules makes it easier to test and extend individual pieces of the bot.
+
 ## Running tests
 
 Run the automated test suite with `pytest`:

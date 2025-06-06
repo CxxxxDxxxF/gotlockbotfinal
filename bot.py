@@ -3,8 +3,10 @@
 import os
 import logging
 import discord
-from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
+
+from commands import register_commands
+from tasks import create_log_guild_count_task
 
 # Basic logging
 logging.basicConfig(level=logging.INFO)
@@ -22,11 +24,11 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Set up a Tree for application commands
 tree = bot.tree
 
+# Create background tasks
+log_guild_count = create_log_guild_count_task(bot)
 
-@tasks.loop(minutes=30)
-async def log_guild_count() -> None:
-    """Log how many guilds the bot is connected to."""
-    log.info("Currently connected to %d guild(s)", len(bot.guilds))
+# Register commands immediately so tests can inspect them
+postpick_command = register_commands(tree, GUILD_ID)
 
 @bot.event
 async def on_ready():
@@ -42,44 +44,6 @@ async def on_ready():
 
     if not log_guild_count.is_running():
         log_guild_count.start()
-
-
-# ———————————————————————————————————————————————
-# Define the /postpick command on the tree
-# —————————————————————————————————————————————
-
-@tree.command(
-    name="postpick",
-    description="Register a pick and post it to your chosen channel",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.describe(
-    units="How many units (e.g. 1.0) to wager on this pick",
-    channel="Which channel to post the pick in"
-)
-async def postpick(interaction: discord.Interaction, units: float, channel: discord.TextChannel):
-    """
-    /postpick handler: confirm the pick and post it into the specified channel.
-    """
-    # Acknowledge immediately (defer) so the user does not see an “application did not respond” error.
-    await interaction.response.defer(ephemeral=True)
-
-    # Build a nice embed summarizing the pick.
-    embed = discord.Embed(
-        title="📣 New Pick Posted!",
-        description=f"**Units:** {units}\n**Picked by:** {interaction.user.mention}"
-    )
-    embed.set_footer(text="Good luck! 🍀")
-
-    # Send that embed to the target channel.
-    await channel.send(embed=embed)
-
-    # Finally, send a follow-up to the original user confirming it was posted.
-    await interaction.followup.send(
-        f"✅ Your pick of **{units} units** has been posted in {channel.mention}.",
-        ephemeral=True
-    )
-
 
 def run_bot() -> None:
     """Run the Discord bot after validating configuration."""

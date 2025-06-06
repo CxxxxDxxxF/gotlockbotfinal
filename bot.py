@@ -63,6 +63,19 @@ async def postpick(interaction: discord.Interaction, units: float, channel: disc
     )
 
 @tree.command(
+    name="ping",
+    description="Check bot latency",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def ping(interaction: discord.Interaction):
+    """Reply with the bot's latency."""
+    await interaction.response.defer(ephemeral=True)
+    await interaction.followup.send(
+        f"Pong! Latency: {bot.latency * 1000:.2f} ms",
+        ephemeral=True,
+    )
+
+@tree.command(
     name="analyze_bet",
     description="Upload a bet slip image to generate an AI-backed breakdown",
     guild=discord.Object(id=GUILD_ID)

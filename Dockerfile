@@ -15,4 +15,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends git tesseract-o
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Start the bot (replace with your main filename if different)
-CMD ["python", "main.py"]
+# Start the Discord bot
+CMD ["python", "bot.py"]

@@ -20,7 +20,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     log.info(f"GotLockz bot logged in as {bot.user} (ID: {bot.user.id})")
     log.info(f"Registering slash commands to guild {GUILD_ID}…")
 

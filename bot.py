@@ -14,10 +14,13 @@ from ai_analysis import generate_analysis
 
 # Read environment variables
 TOKEN = os.getenv("DISCORD_TOKEN", "dummy")
-GUILD_ID = int(os.getenv("GUILD_ID", "0"))
+GUILD_ID = int(os.getenv("GUILD_ID", "8"))
 
 # Intents and bot setup
 intents = discord.Intents.default()
+intents.guilds = True
+intents.messages = True
+intents.message_content = True  # This is important if you analyze content in the future
 bot = commands.Bot(command_prefix="/", intents=intents)
 tree = bot.tree
 

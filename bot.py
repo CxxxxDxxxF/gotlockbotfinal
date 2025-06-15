@@ -1,3 +1,4 @@
+
 # bot.py
 
 import os
@@ -64,13 +65,20 @@ async def postpick(
 
     print(f"🧾 Extracted OCR Text:\n{text}")
 
-    # STEP 3: Use sample placeholders (replace this after parser + GPT logic)
-    play_number = 7
-    date_str = datetime.utcnow().strftime("%-m/%-d/%y")
-    game = "Yankees @ Red Sox (7:10 PM EST)"
-    bet = "Hunter Dobbins – Over 2.5 Earned Runs"
-    odds = "-115"
-    analysis = "Dobbins has been getting rocked lately. The Yankees' bats are hot and this line is soft. This is a premium edge — we hammer."
+   # STEP 3: Parse OCR text into structured bet details
+details = parse_bet_details(text)
+
+if not details:
+    await interaction.followup.send("❌ Couldn't parse the bet slip. Try /analyze_bet to debug.", ephemeral=True)
+    return
+
+play_number = 7  # 🔜 we’ll automate this next
+date_str = datetime.utcnow().strftime("%-m/%-d/%y")
+analysis = await generate_analysis(details)
+
+game = details["game"]
+bet = details["bet"]
+odds = details["odds"]
 
     # Format message using VIP template
     message = format_vip_post(play_number, date_str, game, bet, odds, units, analysis)

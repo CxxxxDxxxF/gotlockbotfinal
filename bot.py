@@ -65,20 +65,20 @@ async def postpick(
 
     print(f"🧾 Extracted OCR Text:\n{text}")
 
-   # STEP 3: Parse OCR text into structured bet details
-details = parse_bet_details(text)
+   # STEP 3:  OCR text into structured bet details
+    details = parse_bet_details(text)
 
-if not details:
-    await interaction.followup.send("❌ Couldn't parse the bet slip. Try /analyze_bet to debug.", ephemeral=True)
-    return
+    if not details:
+        await interaction.followup.send("❌ Couldn't parse the bet slip. Try /analyze_bet to debug.", ephemeral=True)
+        return
 
-play_number = 7  # 🔜 we’ll automate this next
-date_str = datetime.utcnow().strftime("%-m/%-d/%y")
-analysis = await generate_analysis(details)
+    play_number = 7  # 🔜 We’ll automate this later
+    date_str = datetime.utcnow().strftime("%-m/%-d/%y")
+    analysis = await generate_analysis(details)
 
-game = details["game"]
-bet = details["bet"]
-odds = details["odds"]
+    game = details["game"]
+    bet = details["bet"]
+    odds = details["odds"]
 
     # Format message using VIP template
     message = format_vip_post(play_number, date_str, game, bet, odds, units, analysis)

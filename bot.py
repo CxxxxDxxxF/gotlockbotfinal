@@ -29,15 +29,15 @@ async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
 
     try:
-        # Force-clear old commands from Discord and register new ones
         guild = discord.Object(id=int(GUILD_ID))
-        await bot.tree.clear_commands(guild=guild)  # 👈 THIS LINE CLEARS THE OLD COMMANDS
+        bot.tree.clear_commands(guild=guild)  # 🔧 FIX: no await here
         await bot.tree.sync(guild=guild)
         print(f"✅ Force-synced slash commands to guild {GUILD_ID}")
     except Exception as e:
         print(f"⚠️ Guild sync failed: {e}")
         await bot.tree.sync()
         print("✅ Synced slash commands globally.")
+
 
 @bot.tree.command(
     name="postpick",

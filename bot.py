@@ -76,7 +76,7 @@ async def postpick(
 
     play_number = 7  # temp
     date_str = datetime.utcnow().strftime("%-m/%-d/%y")
-    analysis = await generate_analysis(details)
+   analysis = generate_analysis(details)
 
     game = details["game"]
     bet = details["bet"]

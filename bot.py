@@ -1,4 +1,3 @@
-
 # bot.py
 
 import os
@@ -30,14 +29,13 @@ async def on_ready():
 
     try:
         guild = discord.Object(id=int(GUILD_ID))
-        bot.tree.clear_commands(guild=guild)  # 🔧 FIX: no await here
+        bot.tree.clear_commands(guild=guild)
         await bot.tree.sync(guild=guild)
         print(f"✅ Force-synced slash commands to guild {GUILD_ID}")
     except Exception as e:
         print(f"⚠️ Guild sync failed: {e}")
         await bot.tree.sync()
         print("✅ Synced slash commands globally.")
-
 
 @bot.tree.command(
     name="postpick",
@@ -54,10 +52,8 @@ async def postpick(
     channel: discord.TextChannel,
     image: discord.Attachment
 ):
-    # 🚨 Defer first, before anything else
     await interaction.response.defer(ephemeral=True)
 
-    # Now begin the rest of your logic...
     local_path = f"/tmp/{image.filename}"
     await image.save(local_path)
 
@@ -74,31 +70,29 @@ async def postpick(
         await interaction.followup.send("❌ Couldn't parse the bet slip. Try /analyze_bet to debug.", ephemeral=True)
         return
 
-    play_number = 7  # temp
+    # STEP 4: Generate AI analysis
+    analysis = generate_analysis(details)
+
+    # STEP 5: Format message using VIP template
+    play_number = 1  # You can later auto-increment this
     date_str = datetime.utcnow().strftime("%-m/%-d/%y")
-# STEP 4: Generate AI analysis
-analysis = generate_analysis(details)
+    game = details.get("game", "Unknown Game")
+    bet = details.get("bet", "Unknown Bet")
+    odds = details.get("odds", "N/A")
 
-# STEP 5: Format message using VIP template
-play_number = 1  # You can later auto-increment this
-date_str = datetime.utcnow().strftime("%-m/%-d/%y")
-game = details.get("game", "Unknown Game")
-bet = details.get("bet", "Unknown Bet")
-odds = details.get("odds", "N/A")
+    message = format_vip_post(play_number, date_str, game, bet, odds, units, analysis)
 
-message = format_vip_post(play_number, date_str, game, bet, odds, units, analysis)
+    # STEP 6: Send message to channel
+    await channel.send(message)
 
-# STEP 6: Send message to channel
-await channel.send(message)
-
-await interaction.followup.send("✅ VIP pick posted successfully.", ephemeral=True)
+    await interaction.followup.send("✅ VIP pick posted successfully.", ephemeral=True)
 
 @bot.tree.command(
     name="analyze_bet",
     description="Analyze a bet slip image."
 )
 @app_commands.describe(
-    image="Bet slip image to analyze",
+    image="Bet slip image to analyze"
 )
 async def analyze_bet(interaction: discord.Interaction, image: discord.Attachment):
     await interaction.response.defer(ephemeral=True)

@@ -76,16 +76,22 @@ async def postpick(
 
     play_number = 7  # temp
     date_str = datetime.utcnow().strftime("%-m/%-d/%y")
-   analysis = generate_analysis(details)
+# STEP 4: Generate AI analysis
+analysis = generate_analysis(details)
 
-    game = details["game"]
-    bet = details["bet"]
-    odds = details["odds"]
+# STEP 5: Format message using VIP template
+play_number = 1  # You can later auto-increment this
+date_str = datetime.utcnow().strftime("%-m/%-d/%y")
+game = details.get("game", "Unknown Game")
+bet = details.get("bet", "Unknown Bet")
+odds = details.get("odds", "N/A")
 
-    message = format_vip_post(play_number, date_str, game, bet, odds, units, analysis)
-    await channel.send(message)
+message = format_vip_post(play_number, date_str, game, bet, odds, units, analysis)
 
-    await interaction.followup.send("✅ VIP pick posted successfully.", ephemeral=True)
+# STEP 6: Send message to channel
+await channel.send(message)
+
+await interaction.followup.send("✅ VIP pick posted successfully.", ephemeral=True)
 
 @bot.tree.command(
     name="analyze_bet",

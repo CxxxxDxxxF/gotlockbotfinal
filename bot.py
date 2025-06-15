@@ -28,10 +28,14 @@ tree = bot.tree
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-    # Sync slash commands to the specified guild so that /postpick appears quickly.
-    guild = discord.Object(id=int(GUILD_ID))
-    await bot.tree.sync(guild=guild)
-    print("✅ Synchronized slash commands.")
+    try:
+        guild = discord.Object(id=int(GUILD_ID))
+        await bot.tree.sync(guild=guild)
+        print(f"✅ Synced slash commands to guild {GUILD_ID}")
+    except Exception as e:
+        print(f"⚠️ Guild sync failed: {e}")
+        await bot.tree.sync()
+        print("✅ Synced slash commands globally.")
 
 @bot.tree.command(
     name="postpick",

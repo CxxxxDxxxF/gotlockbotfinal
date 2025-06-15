@@ -35,8 +35,7 @@ async def on_ready():
 
 @bot.tree.command(
     name="postpick",
-    description="Post a VIP pick to the specified channel.",
-    guild=discord.Object(id=GUILD_ID),
+    description="Post a VIP pick to the specified channel."
 )
 @app_commands.describe(
     units="How many units are you staking?",
@@ -64,11 +63,9 @@ async def postpick(
         ephemeral=True,
     )
 
-
 @bot.tree.command(
     name="analyze_bet",
-    description="Analyze a bet slip image.",
-    guild=discord.Object(id=GUILD_ID),
+    description="Analyze a bet slip image."
 )
 @app_commands.describe(
     image="Bet slip image to analyze",

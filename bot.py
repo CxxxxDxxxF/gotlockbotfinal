@@ -54,13 +54,13 @@ async def postpick(
     channel: discord.TextChannel,
     image: discord.Attachment
 ):
+    # 🚨 Defer first, before anything else
     await interaction.response.defer(ephemeral=True)
 
-    # STEP 1: Save image in Render-safe temp directory
+    # Now begin the rest of your logic...
     local_path = f"/tmp/{image.filename}"
     await image.save(local_path)
 
-    # STEP 2: OCR the image
     text = extract_text_from_image(local_path)
 
     if os.path.exists(local_path):
@@ -68,14 +68,13 @@ async def postpick(
 
     print(f"🧾 Extracted OCR Text:\n{text}")
 
-   # STEP 3:  OCR text into structured bet details
     details = parse_bet_details(text)
 
     if not details:
         await interaction.followup.send("❌ Couldn't parse the bet slip. Try /analyze_bet to debug.", ephemeral=True)
         return
 
-    play_number = 7  # 🔜 We’ll automate this later
+    play_number = 7  # temp
     date_str = datetime.utcnow().strftime("%-m/%-d/%y")
     analysis = await generate_analysis(details)
 
@@ -83,10 +82,7 @@ async def postpick(
     bet = details["bet"]
     odds = details["odds"]
 
-    # Format message using VIP template
     message = format_vip_post(play_number, date_str, game, bet, odds, units, analysis)
-
-    # STEP 4: Send formatted message to channel
     await channel.send(message)
 
     await interaction.followup.send("✅ VIP pick posted successfully.", ephemeral=True)

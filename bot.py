@@ -24,7 +24,6 @@ intents.message_content = True  # This is important if you analyze content in th
 bot = commands.Bot(command_prefix="/", intents=intents)
 tree = bot.tree
 
-
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
@@ -52,22 +51,25 @@ async def postpick(
     channel: discord.TextChannel,
     image: discord.Attachment
 ):
-    """Send a simple embed with the unit amount to the given channel."""
-
     await interaction.response.defer(ephemeral=True)
 
-    embed = discord.Embed(
-        title="\U0001F4E3 VIP Pick",
-        description=f"Units: **{units}**",
-        timestamp=datetime.utcnow(),
-    )
+    # Save uploaded image temporarily in Render's /tmp directory
+    local_path = f"/tmp/{image.filename}"
+    await image.save(local_path)
 
-    await channel.send(embed=embed)
+    # Extract raw text using OCR
+    text = extract_text_from_image(local_path)
 
-    await interaction.followup.send(
-        f"\u2705 Your VIP pick has been posted in {channel.mention}.",
-        ephemeral=True,
-    )
+    # Clean up image after processing
+    if os.path.exists(local_path):
+        os.remove(local_path)
+
+    # Log the result so we can build the parser next
+    print(f"🧾 Extracted OCR Text:\n{text}")
+
+    # Temporary response while we build formatting next
+    await channel.send(f"🧾 OCR Result:\n```{text[:1500]}```")  # Sends trimmed OCR for now
+    await interaction.followup.send("✅ Bet slip received. OCR output sent to channel.", ephemeral=True)
 
 @bot.tree.command(
     name="analyze_bet",
@@ -77,8 +79,6 @@ async def postpick(
     image="Bet slip image to analyze",
 )
 async def analyze_bet(interaction: discord.Interaction, image: discord.Attachment):
-    """Run OCR on the uploaded image and respond with analysis."""
-
     await interaction.response.defer(ephemeral=True)
 
     local_path = f"/tmp/{image.filename}"
@@ -95,11 +95,9 @@ async def analyze_bet(interaction: discord.Interaction, image: discord.Attachmen
 
     await interaction.followup.send(analysis, ephemeral=True)
 
-
 def run_bot() -> None:
     """Entry point used by main.py to start the bot."""
     bot.run(TOKEN)
-
 
 if __name__ == "__main__":
     run_bot()

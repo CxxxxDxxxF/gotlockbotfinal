@@ -1,3 +1,14 @@
+import pytesseract
+from PIL import Image
+import re
+
+def extract_text_from_image(image_path):
+    """
+    Uses Tesseract OCR to extract text from the uploaded image.
+    """
+    return pytesseract.image_to_string(Image.open(image_path))
+
+
 def parse_bet_details(text):
     """
     Parses relevant information from the OCR'd bet slip text.

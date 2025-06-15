@@ -44,11 +44,13 @@ async def on_ready():
 @app_commands.describe(
     units="How many units are you staking?",
     channel="Channel where the pick should be posted",
+    image="Upload a bet slip image"
 )
 async def postpick(
     interaction: discord.Interaction,
     units: float,
     channel: discord.TextChannel,
+    image: discord.Attachment
 ):
     """Send a simple embed with the unit amount to the given channel."""
 

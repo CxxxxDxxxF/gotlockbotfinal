@@ -7,8 +7,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
-
-# Import helper functions from the local modules
 from image_processing import extract_text_from_image, parse_bet_details
 from ai_analysis import generate_analysis
 
@@ -16,11 +14,12 @@ from ai_analysis import generate_analysis
 TOKEN = os.getenv("DISCORD_TOKEN", "dummy")
 GUILD_ID = int(os.getenv("GUILD_ID", "8"))
 
-# Intents and bot setup
+# Intents
 intents = discord.Intents.default()
 intents.guilds = True
 intents.messages = True
-intents.message_content = True  # This is important if you analyze content in the future
+intents.message_content = True
+
 bot = commands.Bot(command_prefix="/", intents=intents)
 tree = bot.tree
 
@@ -53,23 +52,33 @@ async def postpick(
 ):
     await interaction.response.defer(ephemeral=True)
 
-    # Save uploaded image temporarily in Render's /tmp directory
+    # STEP 1: Save image in Render-safe temp directory
     local_path = f"/tmp/{image.filename}"
     await image.save(local_path)
 
-    # Extract raw text using OCR
+    # STEP 2: OCR the image
     text = extract_text_from_image(local_path)
 
-    # Clean up image after processing
     if os.path.exists(local_path):
         os.remove(local_path)
 
-    # Log the result so we can build the parser next
     print(f"🧾 Extracted OCR Text:\n{text}")
 
-    # Temporary response while we build formatting next
-    await channel.send(f"🧾 OCR Result:\n```{text[:1500]}```")  # Sends trimmed OCR for now
-    await interaction.followup.send("✅ Bet slip received. OCR output sent to channel.", ephemeral=True)
+    # STEP 3: Use sample placeholders (replace this after parser + GPT logic)
+    play_number = 7
+    date_str = datetime.utcnow().strftime("%-m/%-d/%y")
+    game = "Yankees @ Red Sox (7:10 PM EST)"
+    bet = "Hunter Dobbins – Over 2.5 Earned Runs"
+    odds = "-115"
+    analysis = "Dobbins has been getting rocked lately. The Yankees' bats are hot and this line is soft. This is a premium edge — we hammer."
+
+    # Format message using VIP template
+    message = format_vip_post(play_number, date_str, game, bet, odds, units, analysis)
+
+    # STEP 4: Send formatted message to channel
+    await channel.send(message)
+
+    await interaction.followup.send("✅ VIP pick posted successfully.", ephemeral=True)
 
 @bot.tree.command(
     name="analyze_bet",
@@ -95,8 +104,17 @@ async def analyze_bet(interaction: discord.Interaction, image: discord.Attachmen
 
     await interaction.followup.send(analysis, ephemeral=True)
 
+# 💬 FORMATTER FUNCTION
+def format_vip_post(play_number, date_str, game, bet, odds, units, analysis):
+    return f"""🔒 I VIP PLAY #{play_number} 🏆 - {date_str}  
+⚾ | Game: {game}  
+🏆 | {bet} ({odds})  
+💰 | Unit Size: {units}  
+
+👇 | Analysis Below:  
+{analysis}"""
+
 def run_bot() -> None:
-    """Entry point used by main.py to start the bot."""
     bot.run(TOKEN)
 
 if __name__ == "__main__":

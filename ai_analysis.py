@@ -53,7 +53,8 @@ async def generate_analysis(
     )
 
     try:
-        response = await client.chat.completions.create(
+        # Call synchronously since this method is not async
+        response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": "You are an expert MLB betting analyst."},

@@ -1,92 +1,67 @@
-#!/usr/bin/env python3
-"""
-ai_analysis.py
-
-Handles generation of hype-driven, stat-backed betting analyses using OpenAI's API.
-"""
 import os
 import logging
-from typing import Dict
-from openai import OpenAI, error as openai_error
+from openai import OpenAI
 
-# ---- Logging Setup ----
-logging.basicConfig(
-    format="[%(asctime)s] %(levelname)s:%(name)s: %(message)s",
-    level=logging.INFO
-)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ---- OpenAI Client Initialization ----
+# Check for API key at startup
 API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
-    logger.critical("OPENAI_API_KEY environment variable not set.")
-    raise RuntimeError("Missing OPENAI_API_KEY environment variable.")
+    raise RuntimeError("OPENAI_API_KEY environment variable not set.")
 
 client = OpenAI(api_key=API_KEY)
 
 async def generate_analysis(
-    bet_details: Dict[str, str],
+    bet_details: dict,
     model: str = "gpt-4",
-    temperature: float = 0.7,
-    max_tokens: int = 512
+    temperature: float = 0.7
 ) -> str:
     """
-    Generates a hype-driven, stat-backed betting analysis for MLB games.
+    Generates a concise, data-driven betting analysis for MLB picks.
 
     Args:
-        bet_details (Dict[str, str]): Contains keys 'game', 'bet', and 'odds'.
-        model (str): OpenAI model to use.
-        temperature (float): Sampling temperature for creativity.
-        max_tokens (int): Max tokens for the response.
+        bet_details (dict): Dictionary containing bet information.
+        model (str): OpenAI model to use (default: "gpt-4").
+        temperature (float): Sampling temperature for output randomness.
 
     Returns:
-        str: The generated analysis, or an error message.
+        str: Generated analysis or error message.
     """
-    # Validate input
     if not isinstance(bet_details, dict):
-        logger.warning("generate_analysis called with non-dict bet_details.")
+        logger.warning("bet_details is not a dictionary.")
         return "Invalid bet details provided."
 
-    game = bet_details.get("game", "Unknown Game")
-    bet = bet_details.get("bet", "Unknown Bet")
-    odds = bet_details.get("odds", "N/A")
+    # Extract details with sensible defaults
+    game  = bet_details.get("game", "Unknown Game")
+    pick  = bet_details.get("bet", bet_details.get("pick", "Unknown Bet"))
+    units = bet_details.get("units", "N/A")
+    date  = bet_details.get("date", "N/A")
+    time  = bet_details.get("time", "")
+    vip   = bet_details.get("vip", False)
 
-    # Build system and user messages
-    system_message = {
-        "role": "system",
-        "content": (
-            "You are an expert MLB betting analyst. "
-            "Provide a hype-driven, stat-backed, and persuasive analysis. "
-            "Use at least three concrete statistics or historical performance references."
-        )
-    }
-    user_prompt = (
+    # Build the user prompt
+    prompt = (
+        "You're a professional MLB betting analyst. "
+        "Provide a concise, data-driven insight for the following bet:\n\n"
         f"Game: {game}\n"
-        f"Pick: {bet}\n"
-        f"Odds: {odds}\n"
-        "
-        "Write a multi-paragraph analysis explaining why this pick is strong, referencing recent form, matchup advantages, and historical trends. "
-        "Close with a confident prediction."
+        f"Pick: {pick}\n"
+        f"Units: {units}\n"
+        f"Date: {date} {time}\n"
+        f"VIP: {vip}\n"
     )
-    user_message = {"role": "user", "content": user_prompt}
-
-    # Log the prompt (without leaking tokens)
-    logger.info("Generating analysis with OpenAI API for pick: %s | %s | %s", game, bet, odds)
 
     try:
         response = await client.chat.completions.create(
             model=model,
-            messages=[system_message, user_message],
+            messages=[
+                {"role": "system", "content": "You are an expert MLB betting analyst."},
+                {"role": "user",   "content": prompt}
+            ],
             temperature=temperature,
-            max_tokens=max_tokens,
         )
-        text = response.choices[0].message.content.strip()
-        logger.debug("OpenAI response received: %s", text[:100] + '...')
-        return text
-
-    except openai_error.OpenAIError as oe:
-        logger.exception("OpenAI API error during analysis.")
-        return f"Error generating analysis: {oe.__class__.__name__} - {oe}"
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.exception("Unexpected error in generate_analysis.")
-        return f"Unexpected error generating analysis: {e}"
+        logger.exception("Error generating analysis.")
+        return f"Error generating analysis: {e}"

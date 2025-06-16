@@ -4,9 +4,10 @@ main.py
 
 Orchestrates GotLockz bot startup and logs a ready message with timestamp.
 """
+import os
 import logging
 from datetime import datetime
-from bot import run_bot, bot
+from bot import bot  # only import the bot instance
 
 # Configure root logger (ensure format and level)
 logging.basicConfig(
@@ -29,13 +30,16 @@ def ready_message(user) -> str:
 @bot.event
 async def on_ready_status():
     msg = ready_message(bot.user)
-    # Log to console
     logger.info(msg)
-    # Optionally send this message into a designated Discord channel:
+    # Optionally send this to a Discord status channel:
     # status_channel = bot.get_channel(YOUR_STATUS_CHANNEL_ID)
     # if status_channel:
     #     await status_channel.send(msg)
 
 
 if __name__ == "__main__":
-    run_bot()
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        logger.error("DISCORD_TOKEN environment variable not set.")
+        raise RuntimeError("DISCORD_TOKEN must be set to run the bot.")
+    bot.run(token)

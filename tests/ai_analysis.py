@@ -1,25 +1,57 @@
+import pytest
 import openai
 import os
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+import ai_analysis  # assuming your module is named ai_analysis.py
 
-def generate_analysis(bet_details: dict) -> str:
-    prompt = f"""You're a professional MLB betting analyst. Analyze this bet based on the details:
-Game: {bet_details.get('game')}
-Pick: {bet_details.get('pick')}
-Units: {bet_details.get('units')}
-Date: {bet_details.get('date')} Time: {bet_details.get('time')}
-VIP: {bet_details.get('vip')}
-Give a short paragraph of betting insight backed by real recent stats."""
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are an expert MLB betting analyst."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return response["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"Error generating analysis: {e}"
+def test_generate_analysis_success(monkeypatch):
+    # Prepare fake bet_details
+    bet_details = {
+        'game': 'Team A @ Team B',
+        'pick': 'Team A to win',
+        'units': '3',
+        'date': '06/16/25',
+        'time': '19:05',
+        'vip': True
+    }
+
+    # Create a dummy response object
+    class DummyChoice:
+        def __init__(self, content):
+            self.message = SimpleNamespace(content=content)
+
+    class DummyResponse:
+        def __init__(self, content):
+            self.choices = [DummyChoice(content)]
+
+    # Monkey-patch ChatCompletion.create
+    def fake_create(model, messages):
+        # Assert model name
+        assert model == 'gpt-4'
+        # Assert system and user messages present
+        assert any(m['role'] == 'system' for m in messages)
+        assert any(m['role'] == 'user' for m in messages)
+        return DummyResponse("This is a fake analysis.")
+
+    monkeypatch.setenv('OPENAI_API_KEY', 'testkey')
+    monkeypatch.setattr(openai.ChatCompletion, 'create', fake_create)
+
+    # Call the function
+    result = ai_analysis.generate_analysis(bet_details)
+    assert result == "This is a fake analysis."
+
+
+def test_generate_analysis_error(monkeypatch):
+    bet_details = {'game': 'X', 'pick': 'Y', 'units': '1', 'date': 'd', 'time': 't', 'vip': False}
+
+    # Monkey-patch to raise an exception
+    def fake_error(*args, **kwargs):
+        raise Exception("API failure")
+
+    monkeypatch.setenv('OPENAI_API_KEY', 'testkey')
+    monkeypatch.setattr(openai.ChatCompletion, 'create', fake_error)
+
+    # Expect the error message returned
+    result = ai_analysis.generate_analysis(bet_details)
+    assert result.startswith("Error generating analysis:")

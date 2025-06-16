@@ -5,6 +5,7 @@ discord.py>=2.0.0
 aiocache>=0.11.1
 pytesseract>=0.3.10
 Pillow>=9.0.0
+opencv-python-headless>=4.7.0.72
 pybaseball>=2.2.7,<2.3.0
 openai>=0.27.0        # OpenAI Python client
 python-dotenv>=0.21.0 # Load .env for local development

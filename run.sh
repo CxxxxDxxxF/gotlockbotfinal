@@ -1,10 +1,20 @@
-#!/bin/bash
-# Helper script to run the GotLockz bot locally.
+\#!/usr/bin/env bash
 
-# Load environment variables from .env if it exists
-if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+# run.sh: Helper script to run the GotLockz bot locally
+
+# Load environment variables from .env if present
+
+if \[ -f .env ]; then
+
+# Export variables, ignoring commented and blank lines
+
+export \$(grep -Ev '^\s\*#' .env | xargs)
 fi
 
-# Run the bot
-exec python bot.py
+# Ensure tmp directory exists for OCR processing
+
+mkdir -p tmp
+
+# Execute the main entrypoint
+
+exec python main.py

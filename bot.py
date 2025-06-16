@@ -51,12 +51,15 @@ async def on_ready():
     logger.info(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     try:
         guild = discord.Object(id=GUILD_ID)
-        await tree.clear_commands(guild=guild)
+        # clear_commands is sync — don't await it
+        tree.clear_commands(guild=guild)
+        # sync is async
         await tree.sync(guild=guild)
         logger.info(f"🔄 Synced slash commands to guild {GUILD_ID}")
     except Exception as e:
         logger.warning(f"⚠️ Guild sync failed: {e}")
         try:
+            # global sync
             await tree.sync()
             logger.info("🔄 Synced slash commands globally.")
         except Exception as ge:
@@ -140,8 +143,10 @@ async def postpick(
 
     finally:
         # Clean up temp file
-        if os.path.exists(local_path):
+        try:
             os.remove(local_path)
+        except OSError:
+            pass
 
 @tree.command(
     name="analyze_bet",
@@ -169,8 +174,10 @@ async def analyze_bet(
             logger.error(f"Error analyzing bet slip: {e}")
             result = f"Error analyzing bet slip: {e}"
     finally:
-        if os.path.exists(local_path):
+        try:
             os.remove(local_path)
+        except OSError:
+            pass
 
     await interaction.followup.send(result, ephemeral=True)
 
@@ -201,3 +208,4 @@ def generate_vip_message(
 # --- Entry Point for Local Dev ---
 def run_bot():
     bot.run(DISCORD_TOKEN)
+

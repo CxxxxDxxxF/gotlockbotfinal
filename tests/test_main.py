@@ -1,23 +1,55 @@
+import pytest
 import os
-import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import main
-
-class DummyUser:
-    def __str__(self):
-        return "testuser#1234"
+import image_processing
+from image_processing import parse_bet_details, extract_text_from_image
+from PIL import Image
 
 
-def test_ready_message_uses_timestamp(monkeypatch):
-    monkeypatch.setattr(main, "current_timestamp", lambda: "2025-06-06 12:34:56 UTC")
-    assert (
-        main.ready_message(DummyUser())
-        == "\u2714\ufe0f GotLockz bot logged in as testuser#1234 at 2025-06-06 12:34:56 UTC"
-    )
+def test_parse_player_prop():
+    text = "Hunter Dobbins Over 2.5 Earned Runs -110"
+    expected = {
+        "game": "Hunter Dobbins",
+        "bet": "Over 2.5 Earned Runs",
+        "odds": "-110"
+    }
+    assert parse_bet_details(text) == expected
 
 
-def test_current_timestamp_utc():
-    ts = main.current_timestamp()
-    assert ts.endswith("UTC")
+def test_parse_moneyline():
+    text = "New York Yankees at Boston Red Sox +150"
+    expected = {
+        "game": "New York Yankees @ Boston Red Sox",
+        "bet": "New York Yankees – Moneyline",
+        "odds": "+150"
+    }
+    assert parse_bet_details(text) == expected
+
+
+def test_parse_invalid_text():
+    # Text that doesn't contain bet info
+    text = "This has no betting details"
+    assert parse_bet_details(text) is None
+
+
+def test_extract_text_from_image_monkeypatched(monkeypatch, tmp_path):
+    # Create an empty dummy file path
+    dummy_file = tmp_path / "dummy.png"
+    dummy_file.write_bytes(b"")
+
+    # Prepare a fake PIL Image to return
+    fake_img = Image.new('RGB', (10, 10))
+    # Monkeypatch the preprocessing step to bypass OpenCV
+    monkeypatch.setattr(image_processing, 'preprocess_image', lambda path: fake_img)
+    # Monkeypatch pytesseract to return fixed text
+    monkeypatch.setattr(image_processing.pytesseract, 'image_to_string', lambda img, config=None: "SAMPLE OCR OUTPUT")
+
+    # Call the function under test
+    result = extract_text_from_image(str(dummy_file))
+    assert result == "SAMPLE OCR OUTPUT"
+
+
+def test_preprocess_image_file_not_found():
+    # Expect FileNotFoundError for non-existent path
+    with pytest.raises(FileNotFoundError):
+        image_processing.preprocess_image("nonexistent_file.png")

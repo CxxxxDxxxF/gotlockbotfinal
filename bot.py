@@ -11,7 +11,7 @@ import os
 import json
 import logging
 import discord
-import statsapi                 # ← changed here
+import statsapi                 # ← your MLB stats API
 from discord import TextChannel
 from discord.ext import commands
 from discord import app_commands
@@ -66,10 +66,6 @@ CHANNEL_CONFIG = {
 
 # ---- Helpers ----
 def lookup_game_time(away: str, home: str) -> datetime | None:
-    """
-    Fetches today's schedule and returns the UTC→EST datetime
-    for the game matching away/home. Returns None if not found.
-    """
     today = datetime.now().date().isoformat()
     sched = statsapi.schedule(start_date=today, end_date=today)
     for day in sched.get("dates", []):
@@ -83,35 +79,14 @@ def lookup_game_time(away: str, home: str) -> datetime | None:
                 return dt_utc.astimezone(ZoneInfo("America/New_York"))
     return None
 
-def generate_vip_message(
-    number: int,
-    details: dict,
-    units: float,
-    analysis: str
-) -> str:
-    """
-    Builds the VIP pick post exactly as spec:
-    🔒 VIP PLAY #X 🏆 – M/D/YY  
-    ⚾  **Game:** Away @ Home (M/D/YY h:mm PM TZ)  
-
-    🏆  **Pick:** Away – Moneyline (±ODDS)  
-    💰  **Units:** X  
-
-    👇  **Analysis:**  
-    <analysis>
-    """
-    away = details["away"]
-    home = details["home"]
-    odds = details["odds"]
-
+def generate_vip_message(number: int, details: dict, units: float, analysis: str) -> str:
+    away, home, odds = details["away"], details["home"], details["odds"]
     dt = lookup_game_time(away, home)
     if dt:
         date_str = dt.strftime("%-m/%-d/%y")
         full_time = dt.strftime("%-m/%-d/%y %-I:%M %p %Z")
     else:
-        date_str = datetime.now().strftime("%-m/%-d/%y")
-        full_time = ""
-
+        date_str, full_time = datetime.now().strftime("%-m/%-d/%y"), ""
     parts = [
         f"🔒 VIP PLAY #{number} 🏆 – {date_str}",
         f"⚾  **Game:** {away} @ {home}" + (f" ({full_time})" if full_time else ""),
@@ -124,61 +99,17 @@ def generate_vip_message(
     ]
     return "\n".join(parts)
 
-def generate_lotto_message(
-    number: int,
-    details: dict
-) -> str:
-    """
-    Lotto‐ticket multi‐leg format:
-    🔒 I LOTTO TICKET #X – M/D/YY
-    🏆 I Player – Bet (Odds)
-    …
-    💰 I Parlayed: +Y
-    (THESE ARE 1-2 UNITS PLAYS)
-    """
-    date_str = datetime.now().strftime("%-m/%-d/%y")
-    header = f"🔒 I LOTTO TICKET #{number} – {date_str}"
-    pick_lines = [
-        f"🏆 I {p['player']} - {p['bet']} ({p['odds']})"
-        for p in details["picks"]
-    ]
-    parts = [
-        header,
-        *pick_lines,
-        "",
-        f"💰 I Parlayed: {details['parlay']}",
-        "",
-        "(THESE ARE 1-2 UNITS PLAYS)"
-    ]
-    return "\n".join(parts)
-
-def generate_free_message(
-    number: int,
-    details: dict,
-    units: float,
-    analysis: str
-) -> str:
-    """
-    Free‐play format:
-    FREE PLAY #X – M/D/YY
-    ⚾ I Game: Away @ Home
-    🏆 I Pick: Away – Moneyline (Odds)
-    💰 I Units: X
-    👇 I Analysis Below:
-    <analysis>
-    """
-    away = details["away"]
-    home = details["home"]
-    odds = details["odds"]
-    date_str = datetime.now().strftime("%-m/%-d/%y")
-
+def generate_generic_message(number: int, details: dict, units: float, analysis: str, kind: str) -> str:
+    header_emoji, header_title = {
+        "lotto": ("🎲", "LOTTO PLAY"),
+        "free":  ("🆓", "FREE PLAY"),
+    }[kind]
     lines = [
-        f"FREE PLAY #{number} - {date_str}",
-        f"⚾ I Game: {away} @ {home}",
-        f"🏆 I Pick: {away} - {details['bet']} ({odds})",
-        f"💰 I Units: {units}",
+        f"{header_emoji} {header_title} #{number} – {datetime.now().strftime('%-m/%-d/%y')}",
+        f"Bet: {details['bet']} ({details['odds']})",
+        f"Units: {units}",
         "",
-        "👇 I Analysis Below:",
+        "Analysis:",
         analysis
     ]
     return "\n".join(lines)
@@ -208,7 +139,7 @@ async def postpick(
     channel: TextChannel,
     image: discord.Attachment
 ):
-    # 1) ACK to avoid timeout
+    # 1) ACK immediately
     await interaction.response.defer(ephemeral=True)
 
     # 2) Validate
@@ -257,18 +188,18 @@ async def postpick(
     # 6) Build & post
     if kind == "vip":
         msg = generate_vip_message(COUNTERS[kind], details, units, analysis)
-    elif kind == "lotto":
-        msg = generate_lotto_message(COUNTERS[kind], details)
-    else:  # free
-        msg = generate_free_message(COUNTERS[kind], details, units, analysis)
-
+    else:
+        msg = generate_generic_message(
+            COUNTERS[kind], details, units, analysis, kind
+        )
     await channel.send(msg)
 
-    # 7) Ephemeral confirm
+    # 7) Ephemeral confirmation
     await interaction.followup.send(
         f"✅ Your pick has been posted to {channel.mention}.",
         ephemeral=True
     )
+
 
 # ---- /analyze Command ----
 @tree.command(

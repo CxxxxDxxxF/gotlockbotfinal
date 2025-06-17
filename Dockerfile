@@ -11,6 +11,7 @@ ENV PYTHONUNBUFFERED=1
 # Install system deps (Tesseract, tzdata for zoneinfo, etc.)
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
+       git \
        tesseract-ocr \
        libtesseract-dev \
        libleptonica-dev \

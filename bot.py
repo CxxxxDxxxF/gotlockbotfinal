@@ -186,55 +186,67 @@ async def postpick(
     channel: TextChannel,
     image: discord.Attachment
 ):
-    await interaction.response.defer(ephemeral=True)
+    # 1) Immediate ack to avoid interaction timeout
+    await interaction.response.send_message("⏳ Processing your pick…", ephemeral=True)
 
-    cfg = CHANNEL_CONFIG.get(channel.id)
-    if not cfg:
-        await interaction.followup.send(
-            "❌ I can only post to VIP, Lotto, or Free channels.",
-            ephemeral=True
+    # 2) Validate channel & units
+    kind = CHANNEL_CONFIG.get(channel.id)
+    if not kind:
+        return await interaction.edit_original_response(
+            content="❌ I can only post to VIP, Lotto, or Free channels."
         )
-        return
+    if units <= 0:
+        return await interaction.edit_original_response(
+            content="❌ Units must be greater than zero."
+        )
 
-    # save & OCR
-    raw = await image.read()
+    # 3) OCR & parse
     try:
+        raw = await image.read()
         text = extract_text_from_image(raw)
+        details = parse_bet_details(text)
+        if not details:
+            return await interaction.edit_original_response(
+                content="❌ Couldn't parse the bet slip. Try /analyze to debug."
+            )
     except Exception as e:
-        logger.error(f"OCR failure: {e}")
-        return await interaction.followup.send(
-            "❌ Failed to OCR the image.",
-            ephemeral=True
+        logger.exception("OCR/parsing failed")
+        return await interaction.edit_original_response(
+            content=f"❌ Failed processing image: {e}"
         )
 
-    details = parse_bet_details(text)
-    if not details:
-        return await interaction.followup.send(
-            "❌ Couldn't parse bet details. Make sure the slip is clear.",
-            ephemeral=True
-        )
-
-    # AI analysis (sync)
+    # 4) AI analysis
     details["units"] = units
-    analysis = generate_analysis(details)
+    try:
+        analysis = generate_analysis(details)
+    except Exception as e:
+        logger.exception("AI analysis failed")
+        analysis = "⚠️ Analysis failed."
 
-    # bump counter & format
-    key, kind = cfg
-    COUNTERS[key] += 1
+    # 5) Persist counter
+    COUNTERS[kind] += 1
     with open(COUNTER_FILE, "w") as f:
         json.dump(COUNTERS, f)
 
-    if key == "vip":
-        msg = generate_vip_message(COUNTERS[key], details, units, analysis)
+    # 6) Build & post message
+    if kind == "vip":
+        msg = generate_vip_message(COUNTERS[kind], details, units, analysis)
     else:
-        msg = generate_generic_message(COUNTERS[key], details, units, analysis, key)
+        msg = generate_generic_message(
+            COUNTERS[kind],
+            details,
+            units,
+            analysis,
+            kind
+        )
 
-    # post and confirm
     await channel.send(msg)
-    await interaction.followup.send(
-        f"✅ Your pick has been posted to {channel.mention}.",
-        ephemeral=True
+
+    # 7) Edit the original ephemeral with confirmation
+    await interaction.edit_original_response(
+        content=f"✅ Your pick has been posted to {channel.mention}."
     )
+
 
 
 # ---- /analyze Command ----

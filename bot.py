@@ -62,9 +62,9 @@ except FileNotFoundError:
 
 # ---- Channel Configuration (by ID) ----
 CHANNEL_CONFIG = {
-    int(os.getenv("VIP_CHANNEL_ID", 0)):    ("vip",   "VIP"),
-    int(os.getenv("LOTTO_CHANNEL_ID", 0)):  ("lotto", "LOTTO"),
-    int(os.getenv("FREE_CHANNEL_ID", 0)):   ("free",  "FREE"),
+  VIP_ID:   "vip",
+  LOTTO_ID: "lotto",
+  FREE_ID:  "free",
 }
 
 

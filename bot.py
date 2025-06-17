@@ -66,13 +66,27 @@ CHANNEL_CONFIG = {
 
 # ---- Helpers ----
 def lookup_game_time(away: str, home: str) -> datetime | None:
+    """
+    Fetches today's schedule and returns the UTC→EST datetime
+    for the game matching away/home. Handles both the dict
+    and flat-list responses from statsapi.schedule.
+    """
     today = datetime.now().date().isoformat()
     sched = statsapi.schedule(start_date=today, end_date=today)
-    for day in sched.get("dates", []):
-        for g in day.get("games", []):
+
+    # statsapi.schedule sometimes returns a dict {"dates":[...]}
+    # or a flat list of games directly.
+    if isinstance(sched, dict):
+        date_blocks = sched.get("dates", [])
+    else:
+        date_blocks = [{"games": sched}]
+
+    for block in date_blocks:
+        for g in block.get("games", []):
             a = g["teams"]["away"]["team"]["name"]
             h = g["teams"]["home"]["team"]["name"]
             if a.lower() == away.lower() and h.lower() == home.lower():
+                # parse ISO timestamp and convert to EST
                 dt_utc = datetime.fromisoformat(
                     g["gameDate"].replace("Z", "+00:00")
                 )
@@ -199,7 +213,6 @@ async def postpick(
         f"✅ Your pick has been posted to {channel.mention}.",
         ephemeral=True
     )
-
 
 # ---- /analyze Command ----
 @tree.command(

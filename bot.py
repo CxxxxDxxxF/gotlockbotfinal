@@ -57,14 +57,12 @@ try:
 except FileNotFoundError:
     COUNTERS = {"vip": 0, "lotto": 0, "free": 0}
 
-
 # ---- Channel Configuration (by ID) ----
 CHANNEL_CONFIG = {
     int(os.getenv("VIP_CHANNEL_ID", 0)):   "vip",
     int(os.getenv("LOTTO_CHANNEL_ID", 0)): "lotto",
     int(os.getenv("FREE_CHANNEL_ID", 0)):  "free",
 }
-
 
 # ---- Helpers ----
 def lookup_game_time(away: str, home: str) -> datetime | None:
@@ -84,7 +82,6 @@ def lookup_game_time(away: str, home: str) -> datetime | None:
                 )
                 return dt_utc.astimezone(ZoneInfo("America/New_York"))
     return None
-
 
 def generate_vip_message(
     number: int,
@@ -112,7 +109,6 @@ def generate_vip_message(
         date_str = dt.strftime("%-m/%-d/%y")
         full_time = dt.strftime("%-m/%-d/%y %-I:%M %p %Z")
     else:
-        # fallback to today
         date_str = datetime.now().strftime("%-m/%-d/%y")
         full_time = ""
 
@@ -128,47 +124,73 @@ def generate_vip_message(
     ]
     return "\n".join(parts)
 
+def generate_lotto_message(
+    number: int,
+    details: dict
+) -> str:
+    """
+    Lotto‐ticket multi‐leg format:
+    🔒 I LOTTO TICKET #X – M/D/YY
+    🏆 I Player – Bet (Odds)
+    …
+    💰 I Parlayed: +Y
+    (THESE ARE 1-2 UNITS PLAYS)
+    """
+    date_str = datetime.now().strftime("%-m/%-d/%y")
+    header = f"🔒 I LOTTO TICKET #{number} – {date_str}"
+    pick_lines = [
+        f"🏆 I {p['player']} - {p['bet']} ({p['odds']})"
+        for p in details["picks"]
+    ]
+    parts = [
+        header,
+        *pick_lines,
+        "",
+        f"💰 I Parlayed: {details['parlay']}",
+        "",
+        "(THESE ARE 1-2 UNITS PLAYS)"
+    ]
+    return "\n".join(parts)
 
-def generate_generic_message(
+def generate_free_message(
     number: int,
     details: dict,
     units: float,
-    analysis: str,
-    kind: str
+    analysis: str
 ) -> str:
     """
-    For lotto/free channels—adjust emojis & headings as desired.
+    Free‐play format:
+    FREE PLAY #X – M/D/YY
+    ⚾ I Game: Away @ Home
+    🏆 I Pick: Away – Moneyline (Odds)
+    💰 I Units: X
+    👇 I Analysis Below:
+    <analysis>
     """
-    header = {
-        "lotto": ("🎲", "LOTTO PLAY"),
-        "free":  ("🆓", "FREE PLAY"),
-    }[kind]
-    away = details.get("away", details.get("player",""))
-    home = details.get("home", "")
+    away = details["away"]
+    home = details["home"]
     odds = details["odds"]
+    date_str = datetime.now().strftime("%-m/%-d/%y")
 
     lines = [
-        f"{header[0]} {header[1]} #{number} – {datetime.now().strftime('%-m/%-d/%y')}",
-        f"Bet: {details['bet']} ({odds})",
-        f"Units: {units}",
+        f"FREE PLAY #{number} - {date_str}",
+        f"⚾ I Game: {away} @ {home}",
+        f"🏆 I Pick: {away} - {details['bet']} ({odds})",
+        f"💰 I Units: {units}",
         "",
-        "Analysis:",
+        "👇 I Analysis Below:",
         analysis
     ]
     return "\n".join(lines)
-
 
 # ---- Bot Events ----
 @bot.event
 async def on_ready():
     logger.info(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-
-    # clear + sync commands to guild first
     guild = discord.Object(id=GUILD_ID)
     tree.clear_commands(guild=guild)
     await tree.sync(guild=guild)
     logger.info(f"🔄 Synced slash commands to guild {GUILD_ID}")
-
 
 # ---- /postpick Command ----
 @tree.command(
@@ -186,10 +208,10 @@ async def postpick(
     channel: TextChannel,
     image: discord.Attachment
 ):
-    # 1) ACK the interaction
+    # 1) ACK to avoid timeout
     await interaction.response.defer(ephemeral=True)
 
-    # 2) Validate channel & units
+    # 2) Validate
     kind = CHANNEL_CONFIG.get(channel.id)
     if not kind:
         return await interaction.followup.send(
@@ -232,26 +254,21 @@ async def postpick(
     with open(COUNTER_FILE, "w") as f:
         json.dump(COUNTERS, f)
 
-    # 6) Build & post the “public” message
+    # 6) Build & post
     if kind == "vip":
         msg = generate_vip_message(COUNTERS[kind], details, units, analysis)
-    else:
-        msg = generate_generic_message(
-            COUNTERS[kind],
-            details,
-            units,
-            analysis,
-            kind
-        )
+    elif kind == "lotto":
+        msg = generate_lotto_message(COUNTERS[kind], details)
+    else:  # free
+        msg = generate_free_message(COUNTERS[kind], details, units, analysis)
+
     await channel.send(msg)
 
-    # 7) Send the ephemeral confirmation
+    # 7) Ephemeral confirm
     await interaction.followup.send(
         f"✅ Your pick has been posted to {channel.mention}.",
         ephemeral=True
     )
-
-
 
 # ---- /analyze Command ----
 @tree.command(
@@ -280,10 +297,10 @@ async def analyze(
     await interaction.response.defer(ephemeral=True)
     details = {
         "player": teams if "@" not in teams else None,
-        "away": None if "@" not in teams else teams.split("@")[0].strip(),
-        "home": None if "@" not in teams else teams.split("@")[1].strip(),
-        "bet": bet,
-        "odds": "",
+        "away":  None if "@" not in teams else teams.split("@")[0].strip(),
+        "home":  None if "@" not in teams else teams.split("@")[1].strip(),
+        "bet":   bet,
+        "odds":  "",
         "units": ""
     }
     analysis = generate_analysis(details, model=model, temperature=0.8)
@@ -295,6 +312,5 @@ async def analyze(
     embed.add_field(name="Matchup", value=teams, inline=True)
     embed.add_field(name="Bet", value=bet, inline=True)
     await interaction.followup.send(embed=embed)
-
 
 # (no __main__ here—startup handled in main.py)

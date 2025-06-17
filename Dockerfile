@@ -1,14 +1,14 @@
-# Use official Python image
+# Dockerfile
+
 FROM python:3.11-slim
 
-# Create a non-root user
+# Create non-root user
 RUN useradd --create-home --shell /bin/bash botuser
 
-# Set working dir & env
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 
-# Install system deps (incl. Tesseract) and clean up
+# Install system deps (Tesseract, tzdata for zoneinfo, etc.)
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
        tesseract-ocr \
@@ -16,24 +16,21 @@ RUN apt-get update \
        libleptonica-dev \
        pkg-config \
        poppler-utils \
+       tzdata \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy only requirements first to leverage Docker cache
+# Copy & install Python deps
 COPY requirements.txt .
-
-# Upgrade pip & install Python deps
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
-# Copy the rest of the application
+# Copy source & set permissions
 COPY . .
-
-# Ensure tmp folder exists and chown everything to botuser
-RUN mkdir -p /app/tmp \
+RUN mkdir -p tmp \
     && chown -R botuser:botuser /app
 
-# Switch to non-root user
 USER botuser
 
-# Use your run script (it loads .env, creates tmp, then execs main.py)
+# Start bot
 ENTRYPOINT ["bash", "run.sh"]
+

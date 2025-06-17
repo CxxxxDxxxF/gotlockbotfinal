@@ -38,4 +38,3 @@ USER botuser
 
 # 8) Entrypoint
 ENTRYPOINT ["bash", "run.sh"]
-

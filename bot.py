@@ -1,5 +1,3 @@
-# bot.py
-
 #!/usr/bin/env python3
 """
 bot.py
@@ -13,7 +11,7 @@ import os
 import json
 import logging
 import discord
-import mlb_statsapi
+import statsapi                 # ← changed here
 from discord import TextChannel
 from discord.ext import commands
 from discord import app_commands
@@ -35,8 +33,8 @@ logging.basicConfig(
 logger = logging.getLogger("gotlockz-bot")
 
 # ---- Bot Setup ----
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID      = int(os.getenv("GUILD_ID", 0))
+DISCORD_TOKEN       = os.getenv("DISCORD_TOKEN")
+GUILD_ID            = int(os.getenv("GUILD_ID", 0))
 ANALYSIS_CHANNEL_ID = int(os.getenv("ANALYSIS_CHANNEL_ID", 0))
 
 if not DISCORD_TOKEN or not GUILD_ID:
@@ -62,9 +60,9 @@ except FileNotFoundError:
 
 # ---- Channel Configuration (by ID) ----
 CHANNEL_CONFIG = {
-  VIP_ID:   "vip",
-  LOTTO_ID: "lotto",
-  FREE_ID:  "free",
+    int(os.getenv("VIP_CHANNEL_ID", 0)):   "vip",
+    int(os.getenv("LOTTO_CHANNEL_ID", 0)): "lotto",
+    int(os.getenv("FREE_CHANNEL_ID", 0)):  "free",
 }
 
 
@@ -75,15 +73,15 @@ def lookup_game_time(away: str, home: str) -> datetime | None:
     for the game matching away/home. Returns None if not found.
     """
     today = datetime.now().date().isoformat()
-    sched = mlb_statsapi.schedule(start_date=today, end_date=today)
+    sched = statsapi.schedule(start_date=today, end_date=today)
     for day in sched.get("dates", []):
         for g in day.get("games", []):
             a = g["teams"]["away"]["team"]["name"]
             h = g["teams"]["home"]["team"]["name"]
             if a.lower() == away.lower() and h.lower() == home.lower():
-                # parse and convert
-                game_date = g["gameDate"]  # e.g. "2025-06-16T22:40:00Z"
-                dt_utc = datetime.fromisoformat(game_date.replace("Z", "+00:00"))
+                dt_utc = datetime.fromisoformat(
+                    g["gameDate"].replace("Z", "+00:00")
+                )
                 return dt_utc.astimezone(ZoneInfo("America/New_York"))
     return None
 

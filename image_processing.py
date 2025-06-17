@@ -1,3 +1,5 @@
+# image_processing.py
+
 #!/usr/bin/env python3
 """
 image_processing.py
@@ -6,7 +8,7 @@ Handles OCR extraction and parsing of bet slip details.
 """
 import logging
 import re
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 
 import pytesseract
 from PIL import Image
@@ -21,44 +23,62 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def preprocess_image(image_path: str) -> Image.Image:
+def preprocess_image(image_input: Union[str, bytes]) -> np.ndarray:
     """
-    Preprocesses the image for better OCR results:
+    Loads and preprocesses an image (from a file path or raw bytes) for OCR:
+    - Reads via OpenCV
     - Converts to grayscale
     - Applies Gaussian blur
-    - Thresholds using Otsu's method
-    - Resizes for clarity
+    - Thresholds via Otsu
+    - Resizes to max width 1024px
+    Returns the processed binary NumPy array.
     """
-    try:
-        img = cv2.imread(image_path)
+    # load
+    if isinstance(image_input, (bytes, bytearray)):
+        arr = np.frombuffer(image_input, np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if img is None:
-            raise FileNotFoundError(f"Image not found or unreadable: {image_path}")
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (5, 5), 0)
-        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        h, w = thresh.shape
-        # scale to max width of 1024
-        scale = min(1.0, 1024 / float(w))
-        resized = cv2.resize(thresh, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
-        logger.debug("Image preprocessed: grayscale, blur, threshold, resized")
-        return Image.fromarray(resized)
-    except Exception as e:
-        logger.exception("Error during image preprocessing")
-        raise
+            raise FileNotFoundError("Image bytes could not be decoded.")
+    else:
+        img = cv2.imread(image_input)
+        if img is None:
+            raise FileNotFoundError(f"Image not found or unreadable: {image_input}")
+
+    # grayscale + blur + threshold
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # resize to max width 1024
+    h, w = thresh.shape
+    scale = min(1.0, 1024.0 / w)
+    resized = cv2.resize(
+        thresh,
+        (int(w * scale), int(h * scale)),
+        interpolation=cv2.INTER_CUBIC
+    )
+
+    logger.debug("Image preprocessed: grayscale, blur, threshold, resized")
+    return resized
 
 
-def extract_text_from_image(image_path: str, config: Optional[str] = None) -> str:
+def extract_text_from_image(
+    image_input: Union[str, bytes],
+    config: Optional[str] = None
+) -> str:
     """
-    Uses Tesseract OCR to extract text from the image with optional config.
+    Uses Tesseract OCR to extract text from the preprocessed image.
+    Accepts either a file path or raw image bytes.
     """
     if config is None:
         config = "--psm 6 --oem 3"
     try:
-        pil_img = preprocess_image(image_path)
+        bin_img = preprocess_image(image_input)
+        pil_img = Image.fromarray(bin_img)
         text = pytesseract.image_to_string(pil_img, config=config)
-        logger.info(f"OCR extracted {len(text)} characters from {image_path}")
+        logger.info(f"OCR extracted {len(text)} characters")
         return text
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to extract text from image")
         raise
 
@@ -66,50 +86,48 @@ def extract_text_from_image(image_path: str, config: Optional[str] = None) -> st
 def parse_bet_details(text: str) -> Optional[Dict[str, str]]:
     """
     Parses relevant information from OCR'd text.
-    Supports:
-      - Player props (Over/Under)
-      - Team moneyline bets
-    Returns a dict with keys: game, bet, odds
+    - Team moneyline: "Yankees at Red Sox +150"
+    - Player props:    "Player Over 1.5 Hits -120"
+    Returns a dict:
+      Team ML -> {"away":..., "home":..., "bet":..., "odds":...}
+      Prop    -> {"player":..., "bet":..., "odds":...}
     """
     logger.debug("Parsing bet details from OCR text")
-    # Regex patterns
-    prop_pattern = re.compile(
+
+    # patterns
+    prop_pat = re.compile(
         r"([A-Za-z]+(?:\s[A-Za-z]+)+)\s+(Over|Under)\s+([\d\.]+)\s+([A-Za-z]+(?:\s[A-Za-z]+)*)",
         re.IGNORECASE
     )
-    team_pattern = re.compile(
-        r"([A-Za-z\s]+?)\s+at\s+([A-Za-z\s]+)",
-        re.IGNORECASE
-    )
-    odds_pattern = re.compile(r"([-+]\d{2,4})")
+    team_pat = re.compile(r"([A-Za-z\s]+?)\s+at\s+([A-Za-z\s]+)", re.IGNORECASE)
+    odds_pat = re.compile(r"([-+]\d{2,4})")
 
-    prop_match = prop_pattern.search(text)
-    odds_match = odds_pattern.search(text)
+    prop_m = prop_pat.search(text)
+    odds_m = odds_pat.search(text)
 
-    # Player prop
-    if prop_match and odds_match:
-        player = prop_match.group(1).strip()
-        direction = prop_match.group(2).capitalize()
-        value = prop_match.group(3)
-        metric = prop_match.group(4).strip()
-        odds = odds_match.group(1)
+    if prop_m and odds_m:
+        player = prop_m.group(1).strip()
+        direction = prop_m.group(2).capitalize()
+        value = prop_m.group(3)
+        metric = prop_m.group(4).strip()
+        odds = odds_m.group(1)
         bet_desc = f"{direction} {value} {metric}"
         logger.info(f"Detected player prop: {player} | {bet_desc} | {odds}")
         return {
-            "game": player,
+            "player": player,
             "bet": bet_desc,
             "odds": odds
         }
 
-    # Team moneyline
-    team_match = team_pattern.search(text)
-    if team_match and odds_match:
-        team1 = team_match.group(1).strip()
-        team2 = team_match.group(2).strip()
-        odds = odds_match.group(1)
+    team_m = team_pat.search(text)
+    if team_m and odds_m:
+        team1 = team_m.group(1).strip()
+        team2 = team_m.group(2).strip()
+        odds = odds_m.group(1)
         logger.info(f"Detected team moneyline: {team1} @ {team2} | {odds}")
         return {
-            "game": f"{team1} @ {team2}",
+            "away": team1,
+            "home": team2,
             "bet": f"{team1} – Moneyline",
             "odds": odds
         }

@@ -13,8 +13,7 @@ gspread>=5.7.0
 google-auth>=2.20.0
 oauth2client>=4.1.3
 
-# MLB Stats API directly from GitHub's master branch,
-# installed as the `statsapi` module
-https://github.com/toddrob99/MLB-StatsAPI/archive/refs/heads/master.zip#egg=statsapi
+# MLB Stats API directly from GitHub (master branch ZIP)
+https://github.com/toddrob99/MLB-StatsAPI/archive/refs/heads/master.zip#egg=mlb-statsapi
 
 pytest>=7.0.0

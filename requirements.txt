@@ -16,7 +16,9 @@ google-auth>=2.20.0
 oauth2client>=4.1.3
 
 # MLB Stats API wrapper from PyPI
-git+https://github.com/toddwschneider/MLB-StatsAPI.git@main#egg=mlb-statsapi
+# MLB Stats API directly from GitHub
+git+https://github.com/toddwschneider/MLB-StatsAPI.git@master#egg=mlb-statsapi
+
 
 # Testing
 pytest>=7.0.0

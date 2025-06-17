@@ -186,18 +186,20 @@ async def postpick(
     channel: TextChannel,
     image: discord.Attachment
 ):
-    # 1) Immediate ack to avoid interaction timeout
-    await interaction.response.send_message("⏳ Processing your pick…", ephemeral=True)
+    # 1) ACK the interaction
+    await interaction.response.defer(ephemeral=True)
 
     # 2) Validate channel & units
     kind = CHANNEL_CONFIG.get(channel.id)
     if not kind:
-        return await interaction.edit_original_response(
-            content="❌ I can only post to VIP, Lotto, or Free channels."
+        return await interaction.followup.send(
+            "❌ I can only post to VIP, Lotto, or Free channels.",
+            ephemeral=True
         )
     if units <= 0:
-        return await interaction.edit_original_response(
-            content="❌ Units must be greater than zero."
+        return await interaction.followup.send(
+            "❌ Units must be greater than zero.",
+            ephemeral=True
         )
 
     # 3) OCR & parse
@@ -206,20 +208,22 @@ async def postpick(
         text = extract_text_from_image(raw)
         details = parse_bet_details(text)
         if not details:
-            return await interaction.edit_original_response(
-                content="❌ Couldn't parse the bet slip. Try /analyze to debug."
+            return await interaction.followup.send(
+                "❌ Couldn't parse the bet slip. Try /analyze to debug.",
+                ephemeral=True
             )
     except Exception as e:
         logger.exception("OCR/parsing failed")
-        return await interaction.edit_original_response(
-            content=f"❌ Failed processing image: {e}"
+        return await interaction.followup.send(
+            f"❌ Failed processing image: {e}",
+            ephemeral=True
         )
 
     # 4) AI analysis
     details["units"] = units
     try:
         analysis = generate_analysis(details)
-    except Exception as e:
+    except Exception:
         logger.exception("AI analysis failed")
         analysis = "⚠️ Analysis failed."
 
@@ -228,7 +232,7 @@ async def postpick(
     with open(COUNTER_FILE, "w") as f:
         json.dump(COUNTERS, f)
 
-    # 6) Build & post message
+    # 6) Build & post the “public” message
     if kind == "vip":
         msg = generate_vip_message(COUNTERS[kind], details, units, analysis)
     else:
@@ -239,12 +243,12 @@ async def postpick(
             analysis,
             kind
         )
-
     await channel.send(msg)
 
-    # 7) Edit the original ephemeral with confirmation
-    await interaction.edit_original_response(
-        content=f"✅ Your pick has been posted to {channel.mention}."
+    # 7) Send the ephemeral confirmation
+    await interaction.followup.send(
+        f"✅ Your pick has been posted to {channel.mention}.",
+        ephemeral=True
     )
 
 

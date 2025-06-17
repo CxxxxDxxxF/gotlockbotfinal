@@ -1,68 +1,70 @@
+# ai_analysis.py
+
+#!/usr/bin/env python3
+"""
+ai_analysis.py
+
+Synchronous GPT-based analysis generator for bets.
+"""
 import os
 import logging
 from openai import OpenAI
 
-# Configure logging
+# ---- Logging Setup ----
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Check for API key at startup
+# ---- OpenAI Client ----
 API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
     raise RuntimeError("OPENAI_API_KEY environment variable not set.")
-
 client = OpenAI(api_key=API_KEY)
 
-async def generate_analysis(
+
+def generate_analysis(
     bet_details: dict,
     model: str = "gpt-4",
     temperature: float = 0.7
 ) -> str:
     """
-    Generates a concise, data-driven betting analysis for MLB picks.
-
-    Args:
-        bet_details (dict): Dictionary containing bet information.
-        model (str): OpenAI model to use (default: "gpt-4").
-        temperature (float): Sampling temperature for output randomness.
-
-    Returns:
-        str: Generated analysis or error message.
+    Generates a concise, data-driven betting analysis.
+    Expects bet_details with keys: away, home or player, bet, odds, units (optional).
     """
     if not isinstance(bet_details, dict):
         logger.warning("bet_details is not a dictionary.")
         return "Invalid bet details provided."
 
-    # Extract details with sensible defaults
-    game  = bet_details.get("game", "Unknown Game")
-    pick  = bet_details.get("bet", bet_details.get("pick", "Unknown Bet"))
-    units = bet_details.get("units", "N/A")
-    date  = bet_details.get("date", "N/A")
-    time  = bet_details.get("time", "")
-    vip   = bet_details.get("vip", False)
+    # build a human‐readable game identifier
+    if "away" in bet_details and "home" in bet_details:
+        game = f"{bet_details['away']} @ {bet_details['home']}"
+    else:
+        game = bet_details.get("player", "Unknown Bet")
 
-    # Build the user prompt
-    prompt = (
-        "You're a professional MLB betting analyst. "
-        "Provide a concise, data-driven insight for the following bet:\n\n"
-        f"Game: {game}\n"
-        f"Pick: {pick}\n"
-        f"Units: {units}\n"
-        f"Date: {date} {time}\n"
-        f"VIP: {vip}\n"
+    pick  = bet_details.get("bet", "Unknown Bet")
+    units = bet_details.get("units", "N/A")
+
+    # system + user prompt
+    system = "You are an expert MLB betting analyst."
+    user   = (
+        f"Here are the bet details:\n"
+        f"- Game/Player: {game}\n"
+        f"- Pick: {pick}\n"
+        f"- Odds: {bet_details.get('odds','N/A')}\n"
+        f"- Units: {units}\n\n"
+        "Write a 1–2 paragraph, punchy, persuasive analysis of why this is a strong wager."
     )
 
     try:
-        # Call synchronously since this method is not async
-        response = client.chat.completions.create(
+        resp = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You are an expert MLB betting analyst."},
-                {"role": "user",   "content": prompt}
+                {"role": "system",  "content": system},
+                {"role": "user",    "content": user}
             ],
             temperature=temperature,
+            max_tokens=300,
         )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
+        return resp.choices[0].message.content.strip()
+    except Exception:
         logger.exception("Error generating analysis.")
-        return f"Error generating analysis: {e}"
+        return "⚠️ Error generating analysis."

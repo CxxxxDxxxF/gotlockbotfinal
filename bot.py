@@ -11,7 +11,7 @@ import os
 import json
 import logging
 import discord
-import statsapi                 # ← your MLB stats API
+import statsapi  # your MLB stats API
 from discord import TextChannel
 from discord.ext import commands
 from discord import app_commands
@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from image_processing import extract_text_from_image, parse_bet_details
-from ai_analysis      import generate_analysis
+from ai_analysis import generate_analysis
 
 # ---- Load .env ----
 load_dotenv()
@@ -33,8 +33,8 @@ logging.basicConfig(
 logger = logging.getLogger("gotlockz-bot")
 
 # ---- Bot Setup ----
-DISCORD_TOKEN       = os.getenv("DISCORD_TOKEN")
-GUILD_ID            = int(os.getenv("GUILD_ID", 0))
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+GUILD_ID = int(os.getenv("GUILD_ID", 0))
 ANALYSIS_CHANNEL_ID = int(os.getenv("ANALYSIS_CHANNEL_ID", 0))
 
 if not DISCORD_TOKEN or not GUILD_ID:
@@ -59,74 +59,90 @@ except FileNotFoundError:
 
 # ---- Channel Configuration (by ID) ----
 CHANNEL_CONFIG = {
-    int(os.getenv("VIP_CHANNEL_ID", 0)):   "vip",
+    int(os.getenv("VIP_CHANNEL_ID", 0)): "vip",
     int(os.getenv("LOTTO_CHANNEL_ID", 0)): "lotto",
-    int(os.getenv("FREE_CHANNEL_ID", 0)):  "free",
+    int(os.getenv("FREE_CHANNEL_ID", 0)): "free",
 }
 
 # ---- Helpers ----
 def lookup_game_time(away: str, home: str) -> datetime | None:
     """
-    Fetches today's schedule and returns the UTC→EST datetime
-    for the game matching away/home. Handles both the dict
-    and flat-list responses from statsapi.schedule.
+    Fetches today's schedule and returns the EST datetime
+    for the game matching away/home. Returns None if not found.
     """
     today = datetime.now().date().isoformat()
     sched = statsapi.schedule(start_date=today, end_date=today)
-
-    # statsapi.schedule sometimes returns a dict {"dates":[...]}
-    # or a flat list of games directly.
-    if isinstance(sched, dict):
-        date_blocks = sched.get("dates", [])
+    # statsapi.schedule may return a list or dict with "dates"
+    games = []
+    if isinstance(sched, dict) and "dates" in sched:
+        for day in sched["dates"]:
+            games.extend(day.get("games", []))
+    elif isinstance(sched, list):
+        games = sched
     else:
-        date_blocks = [{"games": sched}]
+        return None
 
-    for block in date_blocks:
-        for g in block.get("games", []):
-            a = g["teams"]["away"]["team"]["name"]
-            h = g["teams"]["home"]["team"]["name"]
-            if a.lower() == away.lower() and h.lower() == home.lower():
-                # parse ISO timestamp and convert to EST
-                dt_utc = datetime.fromisoformat(
-                    g["gameDate"].replace("Z", "+00:00")
-                )
-                return dt_utc.astimezone(ZoneInfo("America/New_York"))
+    for g in games:
+        a = g["teams"]["away"]["team"]["name"]
+        h = g["teams"]["home"]["team"]["name"]
+        if a.lower() == away.lower() and h.lower() == home.lower():
+            dt_utc = datetime.fromisoformat(
+                g["gameDate"].replace("Z", "+00:00")
+            )
+            return dt_utc.astimezone(ZoneInfo("America/New_York"))
     return None
 
+
 def generate_vip_message(number: int, details: dict, units: float, analysis: str) -> str:
+    """
+    Builds the VIP pick post exactly as spec.
+    """
     away, home, odds = details["away"], details["home"], details["odds"]
     dt = lookup_game_time(away, home)
     if dt:
         date_str = dt.strftime("%-m/%-d/%y")
         full_time = dt.strftime("%-m/%-d/%y %-I:%M %p %Z")
     else:
-        date_str, full_time = datetime.now().strftime("%-m/%-d/%y"), ""
+        date_str = datetime.now().strftime("%-m/%-d/%y")
+        full_time = ""
+
     parts = [
         f"🔒 VIP PLAY #{number} 🏆 – {date_str}",
-        f"⚾  **Game:** {away} @ {home}" + (f" ({full_time})" if full_time else ""),
+        f"⚾ Game: {away} @ {home}" + (f" ({full_time})" if full_time else ""),
         "",
-        f"🏆  **Pick:** {details['bet']} ({odds})",
-        f"💰  **Units:** {units}",
+        f"🏆 Pick: {details['bet']} ({odds})",
+        f"💰 Units: {units}",
         "",
-        "👇  **Analysis:**",
+        "👇 Analysis Below:",
         analysis
     ]
     return "\n".join(parts)
 
-def generate_generic_message(number: int, details: dict, units: float, analysis: str, kind: str) -> str:
+
+def generate_generic_message(
+    number: int,
+    details: dict,
+    units: float,
+    analysis: str,
+    kind: str
+) -> str:
+    """
+    For lotto/free channels—adjust emojis & headings.
+    """
     header_emoji, header_title = {
         "lotto": ("🎲", "LOTTO PLAY"),
-        "free":  ("🆓", "FREE PLAY"),
+        "free": ("🆓", "FREE PLAY"),
     }[kind]
-    lines = [
-        f"{header_emoji} {header_title} #{number} – {datetime.now().strftime('%-m/%-d/%y')}",
+    date_str = datetime.now().strftime("%-m/%-d/%y")
+    parts = [
+        f"{header_emoji} {header_title} #{number} – {date_str}",
         f"Bet: {details['bet']} ({details['odds']})",
         f"Units: {units}",
         "",
-        "Analysis:",
+        "Analysis Below:",
         analysis
     ]
-    return "\n".join(lines)
+    return "\n".join(parts)
 
 # ---- Bot Events ----
 @bot.event
@@ -156,7 +172,7 @@ async def postpick(
     # 1) ACK immediately
     await interaction.response.defer(ephemeral=True)
 
-    # 2) Validate
+    # 2) Validate channel & units
     kind = CHANNEL_CONFIG.get(channel.id)
     if not kind:
         return await interaction.followup.send(
@@ -199,7 +215,7 @@ async def postpick(
     with open(COUNTER_FILE, "w") as f:
         json.dump(COUNTERS, f)
 
-    # 6) Build & post
+    # 6) Build & post the public message
     if kind == "vip":
         msg = generate_vip_message(COUNTERS[kind], details, units, analysis)
     else:
@@ -241,10 +257,10 @@ async def analyze(
     await interaction.response.defer(ephemeral=True)
     details = {
         "player": teams if "@" not in teams else None,
-        "away":  None if "@" not in teams else teams.split("@")[0].strip(),
-        "home":  None if "@" not in teams else teams.split("@")[1].strip(),
-        "bet":   bet,
-        "odds":  "",
+        "away": None if "@" not in teams else teams.split("@")[0].strip(),
+        "home": None if "@" not in teams else teams.split("@")[1].strip(),
+        "bet": bet,
+        "odds": "",
         "units": ""
     }
     analysis = generate_analysis(details, model=model, temperature=0.8)
